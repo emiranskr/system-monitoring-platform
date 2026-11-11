@@ -24,6 +24,21 @@ public static partial class MetricNames
 
     public static bool IsValid(string name) => name.Length <= 64 && Pattern().IsMatch(name);
 
+    /// <summary>
+    /// Adaptor/disk adini metrik anahtari icin guvenli kimlige cevirir. Cevirme KAYIPLIYSA (ASCII disi karakter,
+    /// bosluk, kesme) ayirt edici bir ek (adin SHA-256 ilk 4 hex'i) eklenir: farkli adlar ayni anahtara dusmez (inceleme O6).
+    /// Kayipsiz adlar (orn. 'Ethernet') degismez.
+    /// </summary>
+    public static string SanitizeUnique(string id)
+    {
+        // Yalniz ASCII disi karakter icerenler belirsizlesir (orn. Ağ / Aş ikisi de A_); bosluk gibi zararsiz donusumler eski anahtari korur.
+        if (id.All(ch => ch < 128)) return Sanitize(id);
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(id)))[..4].ToLowerInvariant();
+        var head = Regex.Replace(id, @"[^A-Za-z0-9_-]", "_");
+        if (head.Length > 27) head = head[..27];
+        return head + "-" + hash;
+    }
+
     /// <summary>Adaptor/disk adlarini metrik anahtarinda guvenli bir kimlige cevirir.</summary>
     public static string Sanitize(string id)
     {

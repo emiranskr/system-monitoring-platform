@@ -31,8 +31,11 @@ public sealed class PipelineTests : IDisposable
         var pipeline = new SamplingPipeline(runner, spool, () => DateTimeOffset.UtcNow,
             sampleInterval: TimeSpan.FromMilliseconds(20), batchInterval: TimeSpan.FromMilliseconds(120));
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
-        await pipeline.RunAsync(cts.Token);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var run = pipeline.RunAsync(cts.Token);
+        await TestUtil.WaitUntil(() => spool.PendingCount >= 2);
+        await cts.CancelAsync();
+        await run;
 
         Assert.True(spool.PendingCount >= 2, $"en az 2 batch beklenir, gelen: {spool.PendingCount}");
         var first = spool.PeekOldest()!;
@@ -111,8 +114,11 @@ public sealed class PipelineStatusTests : IDisposable
             () => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(10), TimeSpan.FromHours(1),
             onStatusChange: s => events.Add((s.Name, s.Ok, s.Message)));
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(400));
-        await pipeline.RunAsync(cts.Token);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var run = pipeline.RunAsync(cts.Token);
+        await TestUtil.WaitUntil(() => { lock (events) return events.Count >= 2; });
+        await cts.CancelAsync();
+        await run;
 
         // 4 ardisik hata -> yalnizca 1 "hata" bildirimi; sonra duzelme -> 1 "ok" bildirimi
         Assert.Equal(2, events.Count);

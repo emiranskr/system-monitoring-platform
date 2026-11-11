@@ -3,10 +3,15 @@ namespace SysMon.Agent.Collectors;
 /// <summary>
 /// Collector'lari hata ve zaman asimi izolasyonuyla calistirir. Bir collector'in cokmesi
 /// veya takilmasi digerlerini etkilemez; sonuc CollectorStatus olarak raporlanir.
+/// Takilan (zaman asimina ugrayan) bir collector'in onceki cagrisi BITMEDEN yenisi baslatilmaz: aksi halde
+/// kalici takilma her turda bir is parcacigi/gorev sizdirir ve collector durumu (orn. onceki ornekler) paralel cagrilarla bozulur.
+/// Sonlu olmayan sayilar (NaN, +-Infinity) null yapilir: JSON'a yazilamazlar ve sonraki yuklemeyi kalici bozardi.
 /// </summary>
 public sealed class CollectorRunner(IEnumerable<ICollector> collectors, TimeSpan perCollectorTimeout)
 {
     private readonly ICollector[] _collectors = collectors.ToArray();
+    private readonly Dictionary<ICollector, Task> _inFlight = [];
+    private readonly object _gate = new();
 
     public async Task<CollectionResult> RunOnceAsync(CancellationToken ct)
     {
@@ -27,6 +32,17 @@ public sealed class CollectorRunner(IEnumerable<ICollector> collectors, TimeSpan
     private async Task<(CollectorStatus, IReadOnlyDictionary<string, double?>)> RunOne(ICollector c, CancellationToken ct)
     {
         var empty = new Dictionary<string, double?>();
+
+        lock (_gate)
+        {
+            if (_inFlight.TryGetValue(c, out var prev))
+            {
+                if (!prev.IsCompleted)
+                    return (new CollectorStatus(c.Name, false, "onceki cagri hala calisiyor (takildi); yenisi baslatilmadi"), empty);
+                _inFlight.Remove(c);
+            }
+        }
+
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(perCollectorTimeout);
         Task<IReadOnlyDictionary<string, double?>> task;
@@ -38,6 +54,7 @@ public sealed class CollectorRunner(IEnumerable<ICollector> collectors, TimeSpan
         {
             return (new CollectorStatus(c.Name, false, ex.Message), empty);
         }
+        lock (_gate) _inFlight[c] = task;
 
         // Iptali yok sayan (bloklanan) collector'a karsi sert zaman asimi.
         var timeout = Task.Delay(perCollectorTimeout, ct);
@@ -56,8 +73,12 @@ public sealed class CollectorRunner(IEnumerable<ICollector> collectors, TimeSpan
             var invalid = new List<string>();
             foreach (var kv in data)
             {
-                if (MetricNames.IsValid(kv.Key)) valid[kv.Key] = kv.Value;
-                else invalid.Add(kv.Key);
+                if (!MetricNames.IsValid(kv.Key))
+                {
+                    invalid.Add(kv.Key);
+                    continue;
+                }
+                valid[kv.Key] = kv.Value is { } v && !double.IsFinite(v) ? null : kv.Value;
             }
             return invalid.Count == 0
                 ? (new CollectorStatus(c.Name, true), valid)

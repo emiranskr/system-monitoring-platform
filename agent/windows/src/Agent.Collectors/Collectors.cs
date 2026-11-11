@@ -67,7 +67,7 @@ public sealed class NetworkCollector(INetworkSource source, Func<long> nowMs) : 
         var now = nowMs();
         foreach (var nic in source.Read())
         {
-            var key = MetricNames.Sanitize(nic.Id);
+            var key = MetricNames.SanitizeUnique(nic.Id);
             if (_prev.TryGetValue(key, out var p) && now > p.t && nic.RxBytes >= p.rx && nic.TxBytes >= p.tx)
             {
                 var secs = (now - p.t) / 1000.0;

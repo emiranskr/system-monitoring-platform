@@ -4,20 +4,26 @@ namespace SysMon.Agent.Transport;
 
 /// <summary>
 /// Her sampleInterval'de collector'lari calistirir, ornekleri biriktirir ve batchInterval'de
-/// spool'a yazar. Iptalde kalan ornekler de yazilir (kayip yok). Collector turu iptal edilmez;
+/// sink'e (spool) yazar. Iptalde kalan ornekler de yazilir (kayip yok). Collector turu iptal edilmez;
 /// her tur collector zaman asimiyla zaten sinirlidir, boylece yarim kalan ornek olmaz.
-/// onStatusChange: bir collector'in durumu (ok/mesaj) DEGISTIGINDE bir kez cagrilir; tekrarlayan ayni hata
-/// gunlugu doldurmaz. Ilk basarili tur bildirim uretmez (sessiz normal durum).
+/// onStatusChange: bir collector'in durumu DEGISTIGINDE bir kez cagrilir (tekrarlayan ayni hata gunlugu doldurmaz).
+/// YAZMA HATASI (disk dolu vb.) hattin ve dolayisiyla servisin dusmesine yol acmaz: ornekler tamponda tutulur
+/// ve sonraki flush'ta tekrar denenir; tampon maxBufferedSamples ile sinirlidir (asilirsa EN ESKI ornekler atilir
+/// ve DroppedSamples ile sayilir). Hata onError ile bildirilir.
 /// </summary>
 public sealed class SamplingPipeline(
-    CollectorRunner runner, Spool spool, Func<DateTimeOffset> now, TimeSpan sampleInterval, TimeSpan batchInterval,
-    Action<CollectorStatus>? onStatusChange = null)
+    CollectorRunner runner, IBatchSink sink, Func<DateTimeOffset> now, TimeSpan sampleInterval, TimeSpan batchInterval,
+    Action<CollectorStatus>? onStatusChange = null, Action<Exception>? onError = null, int maxBufferedSamples = 20_000)
 {
     private readonly Dictionary<string, (bool Ok, string? Message)> _lastStatus = [];
+    private readonly List<Sample> _buffer = [];
+
+    public long DroppedSamples { get; private set; }
+
+    public int BufferedSamples => _buffer.Count;
 
     public async Task RunAsync(CancellationToken ct)
     {
-        var buffer = new List<Sample>();
         var lastFlush = now();
         using var timer = new PeriodicTimer(sampleInterval);
         try
@@ -26,10 +32,11 @@ public sealed class SamplingPipeline(
             {
                 var r = await runner.RunOnceAsync(CancellationToken.None);
                 ReportChanges(r.Statuses);
-                buffer.Add(new Sample(now(), new Dictionary<string, double?>(r.Metrics)));
+                _buffer.Add(new Sample(now(), new Dictionary<string, double?>(r.Metrics)));
+                LimitBuffer();
                 if (now() - lastFlush >= batchInterval)
                 {
-                    Flush(buffer);
+                    Flush();
                     lastFlush = now();
                 }
             } while (await timer.WaitForNextTickAsync(ct));
@@ -40,8 +47,16 @@ public sealed class SamplingPipeline(
         }
         finally
         {
-            Flush(buffer);
+            Flush();
         }
+    }
+
+    private void LimitBuffer()
+    {
+        var excess = _buffer.Count - maxBufferedSamples;
+        if (excess <= 0) return;
+        _buffer.RemoveRange(0, excess);
+        DroppedSamples += excess;
     }
 
     private void ReportChanges(IReadOnlyList<CollectorStatus> statuses)
@@ -67,10 +82,19 @@ public sealed class SamplingPipeline(
         }
     }
 
-    private void Flush(List<Sample> buffer)
+    private void Flush()
     {
-        if (buffer.Count == 0) return;
-        spool.Enqueue(buffer.ToArray());
-        buffer.Clear();
+        if (_buffer.Count == 0) return;
+        try
+        {
+            sink.Enqueue(_buffer.ToArray());
+            _buffer.Clear();
+        }
+        catch (Exception ex)
+        {
+            // Ornekler tamponda kalir, sonraki flush'ta tekrar denenir.
+            try { onError?.Invoke(ex); }
+            catch (Exception) { /* bildirim hatasi hatti durdurmaz */ }
+        }
     }
 }
