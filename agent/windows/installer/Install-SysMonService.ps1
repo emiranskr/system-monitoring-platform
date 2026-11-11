@@ -48,7 +48,8 @@ if ($Server) { $bin += " --server `"$Server`"" }
 foreach ($p in $ServerPin) { $bin += " --server-pin `"$p`"" }
 
 if ($existing) {
-    & sc.exe config $ServiceName binPath= $bin | Out-Null
+    # sc.exe config binPath= PowerShell 5.1'de tirnaklari bozar (sessizce eski komut satiri kalir); ImagePath dogrudan yazilir.
+    Set-ItemProperty -Path ('HKLM:\SYSTEM\CurrentControlSet\Services\' + $ServiceName) -Name ImagePath -Value $bin
 } else {
     New-Service -Name $ServiceName -BinaryPathName $bin -DisplayName 'SysMon Agent' `
         -Description 'Sistem izleme platformu agent servisi (dusuk yetkili).' -StartupType Automatic | Out-Null

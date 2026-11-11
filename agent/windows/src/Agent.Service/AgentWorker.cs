@@ -52,6 +52,8 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
                 var uploader = new Uploader(spool, HttpClients.Create(options.ServerPins), new Uri(options.Server),
                     () => ReadToken(store),
                     options, () => DateTimeOffset.UtcNow);
+                log.LogInformation("Yukleme etkin: sunucu {Server}, SPKI pin sayisi {Pins}, korumali token okundu.",
+                    options.Server, options.ServerPins?.Count ?? 0);
                 tasks.Add(UploadLoop(uploader, stoppingToken));
             }
         }

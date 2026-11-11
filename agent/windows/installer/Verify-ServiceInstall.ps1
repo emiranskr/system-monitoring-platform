@@ -127,7 +127,8 @@ try {
     foreach ($l in ($agentLog3 | Select-Object -Last 8)) { Log "AGENTLOG $l" }
     $tokenMissing = [bool]($agentLog3 | Select-String 'Korumali token deposu yok')
     $hasRetryWarn = [bool]($agentLog3 | Select-String 'Yukleme basarisiz')
-    Check 'Servis hesabi korumali token deposunu OKUYABILIYOR (token yok hatasi yok)' (-not $tokenMissing)
+    $uploadEnabled = [bool]($agentLog3 | Select-String 'Yukleme etkin: sunucu')
+    Check 'Servis hesabi korumali token deposunu OKUYABILIYOR ("Yukleme etkin ... token okundu" satiri var, "token deposu yok" yok)' ($uploadEnabled -and -not $tokenMissing)
     Check 'Yukleme dongusu calisiyor (sunucu yok: baglanti hatasi uyarisi var)' $hasRetryWarn
 }
 catch {

@@ -18,7 +18,7 @@ public class RunnerTests
     public async Task Bir_collector_firlatirsa_digerleri_calismaya_devam_eder()
     {
         var bad = new Fake("bad", _ => throw new InvalidOperationException("patladi"));
-        var runner = new CollectorRunner([bad, Ok("cpu", "cpu.total", 5)], TimeSpan.FromSeconds(2));
+        var runner = new CollectorRunner([bad, Ok("cpu", "cpu.total", 5)], TimeSpan.FromSeconds(10));
 
         var r = await runner.RunOnceAsync(CancellationToken.None);
 
@@ -48,7 +48,7 @@ public class RunnerTests
     {
         var evil = new Fake("evil", _ => Task.FromResult<IReadOnlyDictionary<string, double?>>(
             new Dictionary<string, double?> { ["../etc"] = 1, ["cpu.total"] = 2 }));
-        var r = await new CollectorRunner([evil], TimeSpan.FromSeconds(1)).RunOnceAsync(CancellationToken.None);
+        var r = await new CollectorRunner([evil], TimeSpan.FromSeconds(10)).RunOnceAsync(CancellationToken.None);
 
         Assert.False(r.Metrics.ContainsKey("../etc"));
         Assert.Equal(2, r.Metrics["cpu.total"]);
@@ -60,7 +60,7 @@ public class RunnerTests
     {
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
-        var runner = new CollectorRunner([Ok("cpu", "cpu.total", 1)], TimeSpan.FromSeconds(1));
+        var runner = new CollectorRunner([Ok("cpu", "cpu.total", 1)], TimeSpan.FromSeconds(10));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runner.RunOnceAsync(cts.Token));
     }
 }

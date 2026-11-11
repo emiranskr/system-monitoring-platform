@@ -130,17 +130,33 @@ public sealed class TokenStore(string path, IReadOnlyList<string>? extraAccounts
         return result;
     }
 
+    /// <summary>
+    /// Token dosyasina erisebilecek ana hesaplar: SYSTEM + Administrators her zaman. Ek hesap (servis) verilmediyse
+    /// token'i yazan hesap (gelistirici/servisin kendisi) eklenir. Ek hesap verilmisse kurulumu yapan yoneticinin
+    /// kisisel hesabi ACL'e GIRMEZ: token servis icindir, yonetici zaten Administrators uyesidir.
+    /// </summary>
+    public static IReadOnlyList<SecurityIdentifier> AclPrincipals(IReadOnlyList<SecurityIdentifier> extra, SecurityIdentifier? current)
+    {
+        var list = new List<SecurityIdentifier>
+        {
+            new(WellKnownSidType.LocalSystemSid, null),
+            new(WellKnownSidType.BuiltinAdministratorsSid, null),
+        };
+        if (extra.Count == 0 && current is not null) list.Add(current);
+        list.AddRange(extra);
+        return list.Distinct().ToList();
+    }
+
     private static void RestrictAcl(FileInfo file, IReadOnlyList<SecurityIdentifier> extra)
     {
         var security = new FileSecurity();
         security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
-        void Allow(SecurityIdentifier sid) =>
-            security.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, AccessControlType.Allow));
-        Allow(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null));
-        Allow(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
-        var current = WindowsIdentity.GetCurrent().User;
-        if (current is not null) Allow(current); // token'i yazan/okuyan hesap (servis hesabi veya gelistirici)
-        foreach (var sid in extra) Allow(sid);   // ornegin NT SERVICESysMonAgent: okuma + rotasyonda degistirme
+        foreach (var sid in AclPrincipals(extra, WindowsIdentity.GetCurrent().User))
+        {
+            // SYSTEM ve Administrators tam yetki; digerleri (servis hesabi) yalniz okuma/yazma/silme (Modify): ACL degistiremez, sahiplik alamaz.
+            var full = sid.IsWellKnown(WellKnownSidType.LocalSystemSid) || sid.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid);
+            security.AddAccessRule(new FileSystemAccessRule(sid, full ? FileSystemRights.FullControl : FileSystemRights.Modify, AccessControlType.Allow));
+        }
         file.SetAccessControl(security);
     }
 }

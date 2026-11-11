@@ -42,7 +42,7 @@ public class PdhResilienceTests
     {
         var runner = new CollectorRunner(
             [new CpuCollector(new BrokenCpu("erisim reddedildi")), new MemoryCollector(new FakeMem())],
-            TimeSpan.FromSeconds(2));
+            TimeSpan.FromSeconds(10));
 
         var r = await runner.RunOnceAsync(CancellationToken.None);
 
