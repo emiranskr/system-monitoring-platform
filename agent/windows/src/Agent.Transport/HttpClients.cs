@@ -13,15 +13,23 @@ public static class SpkiPin
 
 public static class HttpClients
 {
+    public const long MaxResponseContentBufferSize = 1_048_576; // 1 MB
+
     /// <summary>
     /// pins verilmisse: sunucu yaprak sertifikasinin SPKI parmak izi pinlerden biriyle eslesmedikce baglanti
     /// reddedilir (zincir/ad dogrulamasi yerine anahtar sabitleme; kendinden imzali sunucular icin).
     /// Dogrulama basarisizsa TLS el sikismasi bitmeden kesilir; token ve veri gonderilmez.
     /// pins yoksa: yalnizca normal sistem dogrulamasi. Dogrulamayi kapatan bir mod YOKTUR.
+    /// O7: Yonlendirme izlenmez (AllowAutoRedirect = false), yanit boyutu 1 MB ile sinirlanir,
+    /// baglanti omru 15 dakika ile sinirlanir (DNS guncellemeleri icin).
     /// </summary>
     public static HttpClient Create(IReadOnlyList<string>? pins, TimeSpan? timeout = null)
     {
-        var handler = new SocketsHttpHandler();
+        var handler = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+        };
         if (pins is { Count: > 0 })
         {
             var allowed = pins.ToHashSet(StringComparer.Ordinal);
@@ -35,6 +43,10 @@ public static class HttpClients
                 },
             };
         }
-        return new HttpClient(handler) { Timeout = timeout ?? TimeSpan.FromSeconds(30) };
+        return new HttpClient(handler)
+        {
+            Timeout = timeout ?? TimeSpan.FromSeconds(30),
+            MaxResponseContentBufferSize = MaxResponseContentBufferSize,
+        };
     }
 }

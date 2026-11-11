@@ -22,6 +22,11 @@ public sealed class UploadRobustnessTests : IAsyncDisposable
     private static IReadOnlyList<Sample> One(double v) =>
         [new Sample(new DateTimeOffset(2026, 11, 11, 9, 0, 0, TimeSpan.Zero), new Dictionary<string, double?> { ["cpu.total"] = v })];
 
+    private Spool NewSpool() => new(_dir, new SpoolLimits(50_000_000, TimeSpan.FromHours(24), 1_000_000), () => _now);
+
+    private Uploader NewUploader(Spool s) =>
+        new(s, HttpClients.Create([SpkiPin.Compute(_srv.Cert)]), _srv.Url, () => "t", AgentOptions.Parse([]), () => _now);
+
     [Theory]
     [InlineData("<html><body>502 Bad Gateway</body></html>")]
     [InlineData("")]
@@ -33,15 +38,42 @@ public sealed class UploadRobustnessTests : IAsyncDisposable
     public async Task Bozuk_200_yaniti_Retry_doner_batch_korunur_istisna_firlatmaz(string body)
     {
         await _srv.StartAsync();
-        var spool = new Spool(_dir, new SpoolLimits(50_000_000, TimeSpan.FromHours(24), 1_000_000), () => _now);
+        var spool = NewSpool();
         spool.Enqueue(One(1));
         _srv.Respond = _ => (200, body);
-        var up = new Uploader(spool, HttpClients.Create([SpkiPin.Compute(_srv.Cert)]), _srv.Url, () => "t",
-            AgentOptions.Parse([]), () => _now);
 
-        var outcome = await up.UploadOnceAsync(default);
+        Assert.Equal(UploadOutcome.Retry, await NewUploader(spool).UploadOnceAsync(default));
+        Assert.Equal(1, spool.PendingCount);
+    }
+
+    [Fact]
+    public async Task O7_Yonlendirme_takip_edilmez_ikinci_hosta_istek_ve_veri_gitmez()
+    {
+        await using var other = new TestHttpsServer();
+        await other.StartAsync();
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        spool.Enqueue(One(1));
+        _srv.Respond = _ => (307, "{}");
+        // Yonlendirme basligi test sunucusunda yok; yine de 3xx'i hata sayip izlememeli.
+        var outcome = await NewUploader(spool).UploadOnceAsync(default);
 
         Assert.Equal(UploadOutcome.Retry, outcome);
+        Assert.Equal(1, spool.PendingCount);
+        Assert.Empty(other.Bodies);
+    }
+
+    [Fact]
+    public async Task O7_Cok_buyuk_yanit_govdesi_bellegi_doldurmaz_Retry_doner()
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        spool.Enqueue(One(1));
+        _srv.Respond = _ => (200, "{\"ack_seq\":0,\"pad\":\"" + new string('x', 5_000_000) + "\"}");
+
+        var outcome = await NewUploader(spool).UploadOnceAsync(default);
+
+        Assert.Equal(UploadOutcome.Retry, outcome); // 1 MB tampon sinirini asti -> hata; veri onaylanmis sayilmaz
         Assert.Equal(1, spool.PendingCount);
     }
 }
