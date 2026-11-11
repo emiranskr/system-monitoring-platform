@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Agent.Service\Agent.Service.csproj" />
     <ProjectReference Include="..\..\src\Agent.Collectors\Agent.Collectors.csproj" />
+    <ProjectReference Include="..\..\src\Agent.Transport\Agent.Transport.csproj" />
   </ItemGroup>
 
 </Project>
