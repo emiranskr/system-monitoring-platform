@@ -3,14 +3,37 @@ using SysMon.Agent;
 
 namespace Agent.Tests;
 
-public class HostTests
+public sealed class HostTests : IDisposable
 {
+    private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "sysmon-host-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_dataDir)) Directory.Delete(_dataDir, true);
+    }
+
     [Fact]
     public async Task Host_konsol_modunda_temiz_baslar_ve_durur()
     {
-        using var host = AgentHost.Build(AgentOptions.Parse([]), []);
+        using var host = AgentHost.Build(new AgentOptions(false, false, DataDir: _dataDir), []);
         await host.StartAsync();
         await host.StopAsync();
         Assert.NotNull(host.Services.GetService(typeof(IHostApplicationLifetime)));
+    }
+
+    [Fact]
+    public async Task Host_gercek_collectorlarla_calisir_ve_kapanista_spoola_yazar()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var host = AgentHost.Build(new AgentOptions(false, false, DataDir: _dataDir), []);
+        await host.StartAsync();
+        await Task.Delay(2500);
+        await host.StopAsync();
+
+        var segs = Directory.GetFiles(Path.Combine(_dataDir, "spool"), "seg-*.jsonl");
+        Assert.NotEmpty(segs);
+        var text = string.Concat(segs.Select(File.ReadAllText));
+        Assert.Contains("mem.used_pct", text);
+        Assert.Contains("disk.C.used_pct", text);
     }
 }

@@ -9,6 +9,7 @@ public static class AgentHost
     {
         var builder = Host.CreateApplicationBuilder(args);
         builder.Services.AddSingleton(options);
+        builder.Services.AddHostedService<AgentWorker>();
         if (options.ServiceMode)
         {
             builder.Services.AddWindowsService(o => o.ServiceName = "SysMonAgent");
