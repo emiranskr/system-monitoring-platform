@@ -1,8 +1,8 @@
 # M1 Durum Raporu — 2026-11-11
 
 **Dal:** `feat/m1-review-batch-b` (taban: `feat/m1-agent` commit `51aecdf`)  
-**Son Commit:** `cf70091`  
-**Durum:** **M1 GELİŞTİRMESİ VE GÖZDEN GEÇİRME DÜZELTMELERİ TAMAMLANDI**
+**Kod commit'i:** `cf70091` (doğrulama HEAD'i `d88d40d`)  
+**Durum:** **M1 KAPANMADI.** Kod ve testler yeşil, A5 ve 10 dk soak son kodla doğrulandı. Bağımsız incelemenin son kod üzerindeki nihai raporu repoda yok; açık Critical/Important bulgu olmadığı henüz kanıtlanmadı. Merge ve kapanış kullanıcı onayı bekliyor.
 
 ---
 
@@ -12,7 +12,8 @@
 |---|---|---|---|---|---|---|
 | **Debug** | **145** | **145** | **0** | **0** | ~10 sn | Tüm birim, entegrasyon ve loopback HTTP testleri dahil |
 | **Release** | **130** | **130** | **0** | **0** | ~10 sn | Düz HTTP yasak; gerçek TLS Kestrel uçtan uca testleri dahil |
-| **Outage Soak (Release)** | **1** | **1** | **0** | **0** | 37 sn | `SYSMON_SOAK_REAL_TIMING=1` (1 sn örnek, 5 sn batch, 30 sn sunucu kesintisi; 0 kayıp, 0 çift kayıt, seq boşluksuz) |
+| **Outage Soak (Release, 10 dk kesinti)** | **1** | **1** | **0** | **0** | 13 dk 52 sn | HEAD `d88d40d`, `SYSMON_SOAK_REAL_TIMING=1`, baseline 60 sn, kesinti 600 sn. `SOAK_RAPOR`: kesintide biriken 105 batch, 661 örnek, 115 batch = 115 ham istek, **tekrar=0**, boşalma 170 sn, 11 retry, max bekleme 200,9 sn. Test örnek değerlerini benzersiz sayaçla kontrol ettiğinden kayıp/çift kayıt/seq boşluğu yok. Log: `docs/ilerleme/kanit/soak-10dk-son-kod.log` |
+| **A5 Verify-ServiceInstall (Windows, yönetici)** | - | **BASARILI** | 0 | - | ~100 sn | HEAD `d88d40d`, Release yayını. Sanal hesap, PDH grup gerekliliği, ACL, token, kurtarma, temizlik: tüm kontroller GECTI. Log: `docs/ilerleme/kanit/a5-son-kod.log`. Temizlik ayrıca elle doğrulandı (servis/dizin/grup üyeliği/geçici dosya kalmadı) |
 | **Publish (Release)** | - | **Başarılı** | **0** | - | 3 sn | `Agent.Service` derleme ve paketleme hatasız |
 
 *Not:* Başlangıçta `feat/m1-agent` üzerinde 115 Debug / 100 Release testi mevcuttu. Bu çalışma kapsamında 30 yeni test eklenerek kapsam 145 Debug / 130 Release seviyesine çıkarılmıştır.
@@ -61,7 +62,9 @@
 
 ## 3. Bağımsız Kod İncelemesi (Senior Code Review) Bulguları ve Giderilmesi
 
-Bağımsız gözden geçirme sonucunda tespit edilen bulguların tamamı TDD ile giderilmiştir:
+> **Doğrulama notu:** Aşağıdaki IMP/MIN bulguları commit `cf70091`'den alınmıştır. İncelemenin nihai raporu repoda bulunamadı; "açık Critical/Important kalmadı" iddiası son kod üzerinde yeniden yapılacak bağımsız incelemeyle doğrulanmalıdır (BEKLİYOR).
+
+Aşağıdaki bulgular TDD ile giderildi:
 - **IMP-01 (Düzeltildi):** 409 Conflict yanıtı dizi (`["conflict"]`) veya string (`"conflict"`) döndüğünde `JsonDocument.TryGetProperty` çağrısının `InvalidOperationException` fırlatması engellendi (`doc.RootElement.ValueKind != JsonValueKind.Object` kontrolü eklendi).
 - **IMP-02 (Düzeltildi):** `InstanceLock` alınamadığında `AgentWorker`'ın arka planda asılı kalması engellendi; `IHostApplicationLifetime` enjekte edilerek `lifetime.StopApplication()` ve `Environment.ExitCode = 1` çağrıldı.
 - **MIN-01 (Düzeltildi):** Kurulum betiği parametre temizliği `$Path.Trim().TrimEnd('\', '/')` olarak genişletildi.
@@ -72,5 +75,5 @@ Bağımsız gözden geçirme sonucunda tespit edilen bulguların tamamı TDD ile
 
 ## 4. Sonraki Adım: M1 Kapanışı ve M2 Hazırlığı
 
-- `feat/m1-review-batch-b` dalı `feat/m1-agent` ile birleştirilmeye hazırdır.
-- Tüm M1 kabul kriterleri (A1-A6, ADR 0001-0004, Review Batch A & B) tam kanıtlı şekilde karşılanmıştır.
+- Kalan: son kod üzerinde bağımsız inceleme (Critical/Important = 0 kanıtı), sonra kullanıcıdan merge ve M1 kapanış onayı.
+- M2'ye ve merge'e kullanıcı onayı olmadan geçilmez.
