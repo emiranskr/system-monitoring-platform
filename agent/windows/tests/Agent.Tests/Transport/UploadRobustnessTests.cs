@@ -134,6 +134,21 @@ public sealed class UploadRobustnessTests : IAsyncDisposable
         Assert.Equal(UploadOutcome.Retry, await NewUploader(spool).UploadOnceAsync(default));
     }
 
+    [Theory]
+    [InlineData("[\"conflict\"]")]
+    [InlineData("\"conflict\"")]
+    [InlineData("123")]
+    [InlineData("true")]
+    public async Task K2_409_yaniti_JSON_nesnesi_olmasa_bile_istisna_firlatmaz_Retry_doner(string rawJson)
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        spool.Enqueue(One(1));
+        _srv.Respond = _ => (409, rawJson);
+        Assert.Equal(UploadOutcome.Retry, await NewUploader(spool).UploadOnceAsync(default));
+        Assert.Equal(TimeSpan.Zero, spool.ClockOffset);
+    }
+
     [Fact]
     public async Task K2_Saat_dilimi_eki_olmayan_server_time_UTC_sayilir_Turkce_yerel_ayarda_bile()
     {

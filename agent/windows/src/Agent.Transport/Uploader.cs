@@ -16,7 +16,7 @@ public enum UploadOutcome
     Retry,
     /// <summary>TLS dogrulamasi (SPKI pin / sertifika) basarisiz: hicbir veri veya token gonderilmedi; spool korunur.</summary>
     TlsRejected,
-    /// <summary>401/403: agent durmali, spool korunur, durum yuzeye cikarilmali.</summary>
+    /// <summary>401/403: kimlik hatasi, 5 dk aralikla yeniden denenir, spool korunur.</summary>
     AuthFailed,
 }
 
@@ -194,7 +194,9 @@ public sealed class Uploader
         try
         {
             using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("server_time", out var el) || el.ValueKind != JsonValueKind.String)
+            if (doc.RootElement.ValueKind != JsonValueKind.Object
+                || !doc.RootElement.TryGetProperty("server_time", out var el)
+                || el.ValueKind != JsonValueKind.String)
                 return false;
             var str = el.GetString();
             if (string.IsNullOrWhiteSpace(str)) return false;

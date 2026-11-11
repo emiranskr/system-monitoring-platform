@@ -27,10 +27,10 @@ function Get-LocalGroupNameBySid([string]$sid) {
     return $full.Split('\')[-1]
 }
 
-# Yol temizligi: sondaki ters boluler tirnak kacirma ve komut satiri bozulmalarini onlemek icin temizlenir
-$SourceDir = $SourceDir.TrimEnd('\')
-$InstallDir = $InstallDir.TrimEnd('\')
-$DataDir = $DataDir.TrimEnd('\')
+# Yol temizligi: bosluklar ve sondaki ters/duz boluler tirnak kacirma ve komut satiri bozulmalarini onlemek icin temizlenir
+$SourceDir = $SourceDir.Trim().TrimEnd('\', '/')
+$InstallDir = $InstallDir.Trim().TrimEnd('\', '/')
+$DataDir = $DataDir.Trim().TrimEnd('\', '/')
 
 # O9: Sunucu adresi ve SPKI pin bicim dogrulamalari
 if ($Server) {

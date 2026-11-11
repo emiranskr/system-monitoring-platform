@@ -4,6 +4,7 @@ using SysMon.Agent.Transport;
 namespace Agent.Tests.Transport;
 
 /// <summary>Bagimsiz kod incelemesi (M1) bulgularinin regresyon testleri: K1, K3, O2, O3, O4.</summary>
+[Collection("NonParallelSpoolMemory")]
 public sealed class SpoolReviewTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "sysmon-rev-" + Guid.NewGuid().ToString("N"));

@@ -46,11 +46,12 @@ public sealed class HostTests : IDisposable
         Assert.NotNull(existingLock);
 
         using var host = AgentHost.Build(new AgentOptions(false, false, DataDir: _dataDir), []);
-        // Host baslatildiginda kilit alamayacagi icin ExecuteAsync hemen sonlanmali ve spool olusmamali
+        // Host baslatildiginda kilit alamayacagi icin StopApplication cagirilir ve host kendiliginden durur
         await host.StartAsync();
-        await Task.Delay(500);
-        await host.StopAsync();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await host.WaitForShutdownAsync(cts.Token);
 
+        Assert.Equal(1, Environment.ExitCode);
         Assert.False(Directory.Exists(Path.Combine(_dataDir, "spool")));
     }
 }

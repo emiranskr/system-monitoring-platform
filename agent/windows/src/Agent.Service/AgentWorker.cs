@@ -6,7 +6,7 @@ using SysMon.Agent.Transport;
 namespace SysMon.Agent;
 
 /// <summary>Collector -> spool hatti ve (sunucu verilmisse) spool -> sunucu yukleme dongusu.</summary>
-public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) : BackgroundService
+public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, IHostApplicationLifetime lifetime) : BackgroundService
 {
     private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan BatchInterval = TimeSpan.FromSeconds(5);
@@ -26,6 +26,8 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
         if (instanceLock is null)
         {
             log.LogError("Bu veri dizini ({DataDir}) icin baska bir sysmon ornegi calisiyor; kilit alinamadi. Agent durduruluyor.", dataDir);
+            Environment.ExitCode = 1;
+            lifetime.StopApplication();
             return;
         }
 
