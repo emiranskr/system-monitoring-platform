@@ -245,57 +245,60 @@ public class UploadRunnerTests
     {
         private readonly Queue<UploadOutcome> _q = new(outcomes);
         public int Steps;
+        public bool Exhausted => _q.Count == 0;
         public Task<UploadOutcome> Step(CancellationToken ct)
         {
             Steps++;
-            return Task.FromResult(_q.Count > 0 ? _q.Dequeue() : UploadOutcome.AuthFailed);
+            return Task.FromResult(_q.Count > 0 ? _q.Dequeue() : UploadOutcome.Idle);
         }
     }
 
-    private static (UploadRunner Runner, List<TimeSpan> Delays) Make(Func<CancellationToken, Task<UploadOutcome>> step)
+    /// <summary>Betik bitince (kuyruk bosalinca) dongu iptal edilir; bekleme sureleri kaydedilir (gercek beklemeden).</summary>
+    private static async Task<List<TimeSpan>> Run(Script s, Func<CancellationToken, Task<UploadOutcome>>? step = null)
     {
         var delays = new List<TimeSpan>();
-        var runner = new UploadRunner(step, (d, _) => { delays.Add(d); return Task.CompletedTask; }, new Random(7));
-        return (runner, delays);
+        using var cts = new CancellationTokenSource();
+        var runner = new UploadRunner(step ?? s.Step, (d, _) =>
+        {
+            delays.Add(d);
+            if (s.Exhausted) cts.Cancel();
+            return Task.CompletedTask;
+        }, new Random(7));
+        await runner.RunAsync(cts.Token);
+        return delays;
     }
 
     [Fact]
     public async Task Retry_art_arda_ustel_bekler_Acked_sayaci_sifirlar()
     {
-        var s = new Script(UploadOutcome.Retry, UploadOutcome.Retry, UploadOutcome.Retry, UploadOutcome.Acked, UploadOutcome.Retry);
-        var (r, delays) = Make(s.Step);
-
-        var final = await r.RunAsync(CancellationToken.None);
-
-        Assert.Equal(UploadOutcome.AuthFailed, final);   // betik bitince AuthFailed ile durur
-        Assert.Equal(4, delays.Count);                   // 3 retry + 1 retry (Acked beklemez)
-        Assert.True(delays[1] > delays[0] && delays[2] > delays[1]);          // artiyor
-        Assert.InRange(delays[3].TotalSeconds, 0.5, 1.0);                     // Acked sonrasi sayac sifirlandi
+        var delays = await Run(new Script(UploadOutcome.Retry, UploadOutcome.Retry, UploadOutcome.Retry, UploadOutcome.Acked, UploadOutcome.Retry));
+        Assert.Equal(4, delays.Count);
+        Assert.True(delays[1] > delays[0] && delays[2] > delays[1]);
+        Assert.InRange(delays[3].TotalSeconds, 0.5, 1.0); // Acked sonrasi sayac sifirlandi
     }
 
     [Fact]
     public async Task Idle_bir_saniye_bekler()
     {
-        var (r, delays) = Make(new Script(UploadOutcome.Idle).Step);
-        await r.RunAsync(CancellationToken.None);
-        Assert.Equal(TimeSpan.FromSeconds(1), delays.Single());
+        var delays = await Run(new Script(UploadOutcome.Idle));
+        Assert.Equal(TimeSpan.FromSeconds(1), delays[0]);
     }
 
     [Fact]
     public async Task TlsRejected_tavan_kadar_bekler()
     {
-        var (r, delays) = Make(new Script(UploadOutcome.TlsRejected).Step);
-        await r.RunAsync(CancellationToken.None);
-        Assert.Equal(Backoff.Cap, delays.Single());
+        var delays = await Run(new Script(UploadOutcome.TlsRejected));
+        Assert.Equal(Backoff.Cap, delays[0]);
     }
 
     [Fact]
-    public async Task AuthFailed_dongunun_durmasini_saglar_ve_sonuc_doner()
+    public async Task Inceleme_AuthFailed_kalici_durmaz_5_dakika_bekleyip_yeniden_dener_token_degisince_toparlanir()
     {
-        var s = new Script(UploadOutcome.AuthFailed, UploadOutcome.Acked);
-        var (r, _) = Make(s.Step);
-        Assert.Equal(UploadOutcome.AuthFailed, await r.RunAsync(CancellationToken.None));
-        Assert.Equal(1, s.Steps);
+        var s = new Script(UploadOutcome.AuthFailed, UploadOutcome.AuthFailed, UploadOutcome.Acked, UploadOutcome.Idle);
+        var delays = await Run(s);
+        Assert.Equal(Backoff.Cap, delays[0]);
+        Assert.Equal(Backoff.Cap, delays[1]);
+        Assert.True(s.Steps >= 4, "AuthFailed sonrasi dongu devam etmeli ve sonraki Acked'e ulasmali");
     }
 
     [Fact]
@@ -304,26 +307,26 @@ public class UploadRunnerTests
         var calls = 0;
         var reported = new List<Exception>();
         var delays = new List<TimeSpan>();
+        using var cts = new CancellationTokenSource();
         var r = new UploadRunner(_ =>
         {
             calls++;
             if (calls == 1) throw new InvalidOperationException("beklenmeyen");
-            return Task.FromResult(UploadOutcome.AuthFailed);
-        }, (d, _) => { delays.Add(d); return Task.CompletedTask; }, new Random(7), onUnexpected: reported.Add);
+            return Task.FromResult(UploadOutcome.Idle);
+        }, (d, _) => { delays.Add(d); if (delays.Count == 2) cts.Cancel(); return Task.CompletedTask; }, new Random(7), onUnexpected: reported.Add);
 
-        var final = await r.RunAsync(CancellationToken.None);
+        await r.RunAsync(cts.Token);
 
-        Assert.Equal(UploadOutcome.AuthFailed, final);
         Assert.Single(reported);
-        Assert.Single(delays);
+        Assert.True(delays.Count >= 2);
     }
 
     [Fact]
-    public async Task Iptal_istisna_firlatmadan_null_ile_doner()
+    public async Task Iptal_istisna_firlatmadan_doner()
     {
         using var cts = new CancellationTokenSource();
         var r = new UploadRunner(async ct => { await cts.CancelAsync(); ct.ThrowIfCancellationRequested(); return UploadOutcome.Idle; },
             (_, _) => Task.CompletedTask, new Random(1));
-        Assert.Null(await r.RunAsync(cts.Token));
+        await r.RunAsync(cts.Token); // istisna firlatmamali
     }
 }

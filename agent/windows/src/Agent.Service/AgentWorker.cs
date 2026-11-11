@@ -76,12 +76,13 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
             {
                 if (outcome == UploadOutcome.TlsRejected)
                     log.LogError("Sunucu sertifikasi dogrulanamadi (SPKI pin / sertifika); veri ve token gonderilmedi. {Wait:0} sn sonra yeniden denenecek.", wait.TotalSeconds);
+                else if (outcome == UploadOutcome.AuthFailed)
+                    log.LogWarning("Sunucu kimlik bilgisini reddetti (401/403). {Wait:0} sn sonra yeniden denenecek; token guncellenirse yukleme devam eder.", wait.TotalSeconds);
                 else if (outcome == UploadOutcome.Retry)
                     log.LogWarning("Yukleme basarisiz, {Wait:0.0} sn sonra yeniden denenecek.", wait.TotalSeconds);
             },
             onUnexpected: ex => log.LogError(ex, "Yukleme adiminda beklenmeyen hata; yeniden denenecek."));
 
-        if (await runner.RunAsync(ct) == UploadOutcome.AuthFailed)
-            log.LogError("Sunucu kimlik bilgisini reddetti (401/403). Yukleme durduruldu; ornekler spool da korunuyor.");
+        await runner.RunAsync(ct);
     }
 }

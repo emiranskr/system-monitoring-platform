@@ -1,9 +1,10 @@
 namespace SysMon.Agent.Transport;
 
 /// <summary>
-/// Yukleme dongusu: adim sonucuna gore bekler/durur. Beklenmeyen bir istisna dongunun (ve servisin) dusmesine
+/// Yukleme dongusu: adim sonucuna gore bekler. Beklenmeyen bir istisna dongunun (ve servisin) dusmesine
 /// yol acmaz: Retry gibi geri cekilmeyle beklenir ve onUnexpected ile bildirilir. Iptalde istisna firlatmaz.
-/// AuthFailed donerse dongu durur (spool korunur) ve AuthFailed doner; iptalde null doner.
+/// AuthFailed (401/403) dongu SONLANDIRMAZ: token sonradan iceri aktarilabilir/degisebilir; Backoff.Cap (5 dk)
+/// aralikla yeniden denenir (iptal edilmis cihaz sunucuyu en fazla 5 dakikada bir yoklar).
 /// </summary>
 public sealed class UploadRunner(
     Func<CancellationToken, Task<UploadOutcome>> step,
@@ -12,7 +13,7 @@ public sealed class UploadRunner(
     Action<UploadOutcome, TimeSpan>? onWait = null,
     Action<Exception>? onUnexpected = null)
 {
-    public async Task<UploadOutcome?> RunAsync(CancellationToken ct)
+    public async Task RunAsync(CancellationToken ct)
     {
         var attempt = 0;
         while (!ct.IsCancellationRequested)
@@ -26,7 +27,7 @@ public sealed class UploadRunner(
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    return null;
+                    return;
                 }
                 catch (Exception ex)
                 {
@@ -40,13 +41,12 @@ public sealed class UploadRunner(
                     case UploadOutcome.Acked:
                         attempt = 0;
                         continue; // sirada baska batch olabilir: beklemeden devam
-                    case UploadOutcome.AuthFailed:
-                        return UploadOutcome.AuthFailed;
                     case UploadOutcome.Idle:
                         attempt = 0;
                         wait = TimeSpan.FromSeconds(1);
                         break;
                     case UploadOutcome.TlsRejected:
+                    case UploadOutcome.AuthFailed:
                         wait = Backoff.Cap;
                         break;
                     default: // Retry
@@ -58,10 +58,9 @@ public sealed class UploadRunner(
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                return null;
+                return;
             }
         }
-        return null;
     }
 
     private static void SafeInvoke(Action a)
