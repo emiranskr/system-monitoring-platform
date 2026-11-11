@@ -1,0 +1,20 @@
+# Yalnizca yerel gelistirme veritabani. Uretim yapilandirmasi M6'da eklenir.
+services:
+  db:
+    # TimescaleDB (Community/TSL ozellikleri: sikistirma, continuous aggregate). Surum sabit.
+    image: timescale/timescaledb:2.17.2-pg16
+    environment:
+      POSTGRES_USER: sysmon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?deploy/.env dosyasinda POSTGRES_PASSWORD tanimlayin}
+      POSTGRES_DB: sysmon
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sysmon -d sysmon"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  dbdata:

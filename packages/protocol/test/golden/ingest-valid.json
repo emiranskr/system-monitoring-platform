@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "spool_epoch": "6c1f2b7e-3c55-4b7e-9f0a-1d2e3f4a5b6c",
+  "seq": 1042,
+  "sent_at": "2026-11-11T09:00:05Z",
+  "samples": [
+    { "ts": "2026-11-11T09:00:01Z",
+      "m": { "cpu.total": 23.5, "mem.used_pct": 48.2, "gpu.GPU-8a1f.temp": null, "net.if0.rx_bps": 340000 } }
+  ]
+}
