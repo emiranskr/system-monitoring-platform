@@ -172,6 +172,71 @@ public sealed class UploadRobustnessTests : IAsyncDisposable
         }
         finally { System.Globalization.CultureInfo.CurrentCulture = old; }
     }
+
+    [Fact]
+    public async Task O8_Ayni_batch_icin_ardisik_10_kalici_4xx_batchi_atar_sonraki_batch_gonderilir()
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        var poison = spool.Enqueue(One(1));
+        var next = spool.Enqueue(One(2));
+        _srv.Respond = body => body.GetProperty("seq").GetInt64() == poison.Seq
+            ? (413, "{\"error\":\"too large\"}")
+            : (200, $"{{\"ack_seq\":{next.Seq},\"rejected\":0}}");
+        var up = NewUploader(spool);
+        var dropped = new List<long>();
+        up.BatchDropped += (b, status) => dropped.Add(b.Seq);
+
+        for (var i = 0; i < 9; i++) Assert.Equal(UploadOutcome.Retry, await up.UploadOnceAsync(default));
+        Assert.Empty(dropped);
+        Assert.Equal(2, spool.PendingCount);
+
+        Assert.Equal(UploadOutcome.Acked, await up.UploadOnceAsync(default)); // 10. deneme: atilir
+        Assert.Equal(new[] { poison.Seq }, dropped);
+        Assert.Equal(next.Seq, spool.PeekOldest()!.Seq);
+        Assert.Equal(UploadOutcome.Acked, await up.UploadOnceAsync(default));
+        Assert.Equal(0, spool.PendingCount);
+    }
+
+    [Fact]
+    public async Task O8_Gecici_hatalar_503_429_batchi_asla_atmaz()
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        spool.Enqueue(One(1));
+        var up = NewUploader(spool);
+        var dropped = 0;
+        up.BatchDropped += (_, _) => dropped++;
+        foreach (var status in new[] { 503, 429, 502, 504, 500 })
+        {
+            _srv.Respond = _ => (status, "{}");
+            for (var i = 0; i < 12; i++) Assert.Equal(UploadOutcome.Retry, await up.UploadOnceAsync(default));
+        }
+        Assert.Equal(0, dropped);
+        Assert.Equal(1, spool.PendingCount);
+    }
+
+    [Fact]
+    public async Task O8_Basarili_yukleme_kalici_hata_sayacini_sifirlar()
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        var a = spool.Enqueue(One(1));
+        var up = NewUploader(spool);
+        var dropped = 0;
+        up.BatchDropped += (_, _) => dropped++;
+
+        _srv.Respond = _ => (400, "{}");
+        for (var i = 0; i < 9; i++) await up.UploadOnceAsync(default);
+        _srv.Respond = _ => (200, $"{{\"ack_seq\":{a.Seq},\"rejected\":0}}");
+        Assert.Equal(UploadOutcome.Acked, await up.UploadOnceAsync(default));
+
+        var b = spool.Enqueue(One(2));
+        _srv.Respond = _ => (400, "{}");
+        for (var i = 0; i < 9; i++) Assert.Equal(UploadOutcome.Retry, await up.UploadOnceAsync(default)); // yeni batch icin sayac 0'dan
+        Assert.Equal(0, dropped);
+        Assert.Equal(b.Seq, spool.PeekOldest()!.Seq);
+    }
 }
 
 public class UploadRunnerTests

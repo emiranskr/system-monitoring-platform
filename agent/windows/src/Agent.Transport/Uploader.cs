@@ -47,6 +47,12 @@ public sealed class Uploader
     private readonly Func<string> _token;
     private readonly Func<DateTimeOffset> _now;
 
+    private Guid _lastBatchEpoch = Guid.Empty;
+    private long _lastBatchSeq = -1;
+    private int _consecutivePermanent4xx;
+
+    public event Action<Batch, int>? BatchDropped;
+
     public long RejectedSamples { get; private set; }
 
     public Uploader(Spool spool, HttpClient http, Uri server, Func<string> token, AgentOptions options, Func<DateTimeOffset> now)
@@ -64,6 +70,13 @@ public sealed class Uploader
     {
         var batch = _spool.PeekOldest();
         if (batch is null) return UploadOutcome.Idle;
+
+        if (batch.Epoch != _lastBatchEpoch || batch.Seq != _lastBatchSeq)
+        {
+            _lastBatchEpoch = batch.Epoch;
+            _lastBatchSeq = batch.Seq;
+            _consecutivePermanent4xx = 0;
+        }
 
         using var req = new HttpRequestMessage(HttpMethod.Post, _ingestUrl) { Content = BuildContent(batch) };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token());
@@ -93,7 +106,24 @@ public sealed class Uploader
                 TryApplyServerTime(text);
                 return UploadOutcome.Retry;
             }
-            if (status != 200) return UploadOutcome.Retry; // 429, 5xx ve beklenmeyen kodlar
+
+            // O8: Kalici 4xx hatalari (400, 404, 413, 422 vs.; 408, 429 ve 409 haric).
+            // Ayni batch icin ardisik 10 kalici 4xx alindiginda batch atilir, boylece hat kilitlenmez.
+            var isPermanent4xx = status is >= 400 and < 500 and not 408 and not 429;
+            if (isPermanent4xx)
+            {
+                _consecutivePermanent4xx++;
+                if (_consecutivePermanent4xx >= 10)
+                {
+                    _spool.Ack(batch);
+                    BatchDropped?.Invoke(batch, status);
+                    _consecutivePermanent4xx = 0;
+                    return UploadOutcome.Acked;
+                }
+                return UploadOutcome.Retry;
+            }
+
+            if (status != 200) return UploadOutcome.Retry; // 429, 408, 5xx ve beklenmeyen kodlar: gecici
 
             // Sunucu yaniti guvenilmez girdi sayilir (proxy HTML sayfasi, eksik alan, yanlis tip): hicbiri istisna
             // firlatmaz; dogrulanamayan yanit onay degildir -> batch korunur, yeniden denenir.
@@ -117,6 +147,7 @@ public sealed class Uploader
             }
             if (ack < batch.Seq) return UploadOutcome.Retry; // onaylanmadi: batch silinmez
 
+            _consecutivePermanent4xx = 0; // basarili onay kalici hata sayacini sifirlar
             RejectedSamples += rejected;
             TryApplyServerTime(text);
             _spool.Ack(batch);
