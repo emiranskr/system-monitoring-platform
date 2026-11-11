@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Agent.Service-bff70027-81da-445b-94f8-0619009e9189</UserSecretsId>
@@ -16,4 +16,5 @@
     <ProjectReference Include="..\Agent.Collectors\Agent.Collectors.csproj" />
     <ProjectReference Include="..\Agent.Transport\Agent.Transport.csproj" />
   </ItemGroup>
+
 </Project>

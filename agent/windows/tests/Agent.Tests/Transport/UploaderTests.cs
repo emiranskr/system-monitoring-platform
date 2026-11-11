@@ -21,7 +21,10 @@ public sealed class UploaderTests : IDisposable
 
         public TestServer()
         {
-            var port = new Random().Next(20000, 60000);
+            var probe = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
             Url = new Uri($"http://127.0.0.1:{port}/");
             _l.Prefixes.Add(Url.ToString());
             _l.Start();

@@ -95,7 +95,7 @@ public sealed class TokenStoreTests : IDisposable
     }
 
     [Fact]
-    public void Eszamanli_yazma_sirasinda_okuyucu_hic_bozuk_deger_gormez()
+    public async Task Eszamanli_yazma_sirasinda_okuyucu_hic_bozuk_deger_gormez()
     {
         if (!OperatingSystem.IsWindows()) return;
         var s = new TokenStore(StorePath);
@@ -113,7 +113,7 @@ public sealed class TokenStoreTests : IDisposable
         });
         for (var i = 1; i <= 150; i++) s.Save($"t{i}-{Token}");
         Volatile.Write(ref stop, true);
-        reader.Wait();
+        await reader;
         Assert.True(reads > 50, $"okuma sayisi dusuk: {reads}");
         Assert.Equal(0, failures);
     }
