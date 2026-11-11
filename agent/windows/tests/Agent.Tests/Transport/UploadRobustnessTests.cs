@@ -76,6 +76,28 @@ public sealed class UploadRobustnessTests : IAsyncDisposable
         Assert.Equal(UploadOutcome.Retry, outcome); // 1 MB tampon sinirini asti -> hata; veri onaylanmis sayilmaz
         Assert.Equal(1, spool.PendingCount);
     }
+
+    [Fact]
+    public async Task O11_Yerel_ayar_ar_SA_ve_th_TH_olsa_bile_zaman_damgalari_Gregoryen_ASCII_ISO_formatinda()
+    {
+        var old = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            foreach (var cn in new[] { "ar-SA", "th-TH", "fa-IR" })
+            {
+                System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(cn);
+                await _srv.StartAsync();
+                var spool = new Spool(Path.Combine(_dir, cn), new SpoolLimits(50_000_000, TimeSpan.FromHours(24), 1_000_000), () => _now);
+                spool.Enqueue(One(1));
+                await NewUploader(spool).UploadOnceAsync(default);
+                var body = _srv.Bodies.Last();
+                Assert.Matches(@"^2026-11-11T09:00:00Z$", body.GetProperty("samples")[0].GetProperty("ts").GetString());
+                Assert.Matches(@"^2026-11-11T09:00:00Z$", body.GetProperty("sent_at").GetString());
+                await _srv.StopAsync();
+            }
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = old; }
+    }
 }
 
 public class UploadRunnerTests

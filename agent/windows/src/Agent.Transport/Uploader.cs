@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
@@ -130,10 +131,10 @@ public sealed class Uploader
             v = 1,
             spool_epoch = batch.Epoch,
             seq = batch.Seq,
-            sent_at = (_now() + offset).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss'Z'"),
+            sent_at = (_now() + offset).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss'Z'", CultureInfo.InvariantCulture),
             samples = batch.Samples.Select(s => new
             {
-                ts = (s.Ts + offset).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss'Z'"),
+                ts = (s.Ts + offset).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss'Z'", CultureInfo.InvariantCulture),
                 m = s.M,
             }),
         };
