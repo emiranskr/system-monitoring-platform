@@ -16,7 +16,7 @@ param(
     [string]$ServiceName = 'SysMonAgent',
     [string]$Server,
     [string[]]$ServerPin = @(),
-    [switch]$AddToPerfMonUsers,
+    [switch]$SkipPerfMonUsers,
     [switch]$StartService
 )
 $ErrorActionPreference = 'Stop'
@@ -66,8 +66,8 @@ $sysSid = '*S-1-5-18'; $admSid = '*S-1-5-32-544'
 & icacls.exe $DataDir /inheritance:r /grant:r "${sysSid}:(OI)(CI)F" "${admSid}:(OI)(CI)F" "${account}:(OI)(CI)M" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'icacls (veri dizini) basarisiz' }
 
-# 5) PDH izni (istege bagli; gereksinim G0/A5 olcumuyle belirlenir)
-if ($AddToPerfMonUsers) {
+# 5) PDH izni: A5 gercek-Windows olcumu (ADR 0004): uyelik OLMADAN PDH sayaci eklenemiyor (0xC0000BC8) -> varsayilan ACIK
+if (-not $SkipPerfMonUsers) {
     $grp = Get-LocalGroupNameBySid 'S-1-5-32-558'
     # cmd /c: PowerShell 5.1, ErrorActionPreference=Stop altinda native stderr satirlarini istisnaya cevirir
     & cmd.exe /c "net localgroup ""$grp"" ""$account"" /add >nul 2>&1"

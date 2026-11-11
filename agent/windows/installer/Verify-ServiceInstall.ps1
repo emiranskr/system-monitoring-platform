@@ -45,7 +45,7 @@ function Read-Spool([string]$dir) {
 function Summarize($m) { ($m.Keys | Sort-Object | ForEach-Object { "{0}=dolu{1}/bos{2}" -f $_, $m[$_].dolu, $m[$_].bos }) -join '; ' }
 function Install([switch]$Perf, [string]$Server) {
     $a = @{ SourceDir = $PublishDir; InstallDir = $installDir; DataDir = $dataDir; ServiceName = $svcName; StartService = $true }
-    if ($Perf) { $a.AddToPerfMonUsers = $true }
+    if (-not $Perf) { $a.SkipPerfMonUsers = $true }
     if ($Server) { $a.Server = $Server }
     & (Join-Path $here 'Install-SysMonService.ps1') @a | Out-Null
 }
@@ -123,12 +123,12 @@ try {
     $t0 = Get-Date
     Install -Perf -Server 'https://127.0.0.1:59999'
     Start-Sleep -Seconds 25
-    $ev = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $t0.AddSeconds(-2) } -ErrorAction SilentlyContinue |
-        Where-Object { $_.Message -match 'Yukleme|Korumali token|SysMon' } | Select-Object -First 8
-    foreach ($e in $ev) { Log ("OLAY [{0}] {1}: {2}" -f $e.LevelDisplayName, $e.ProviderName, (($e.Message -split "`n")[0])) }
-    Check 'Servis hesabi korumali token deposunu OKUYABILIYOR (token yok hatasi yok)' (-not ($ev | Where-Object { $_.Message -match 'Korumali token deposu yok' }))
-    $hasRetryWarn = [bool]($ev | Where-Object { $_.Message -match 'Yukleme basarisiz' })
-    Check 'Yukleme dongusu calisiyor (baglanti hatasi uyarisi var)' $hasRetryWarn
+    $agentLog3 = @(Get-Content (Join-Path $dataDir 'logs' | Join-Path -ChildPath 'agent.log') -ErrorAction SilentlyContinue)
+    foreach ($l in ($agentLog3 | Select-Object -Last 8)) { Log "AGENTLOG $l" }
+    $tokenMissing = [bool]($agentLog3 | Select-String 'Korumali token deposu yok')
+    $hasRetryWarn = [bool]($agentLog3 | Select-String 'Yukleme basarisiz')
+    Check 'Servis hesabi korumali token deposunu OKUYABILIYOR (token yok hatasi yok)' (-not $tokenMissing)
+    Check 'Yukleme dongusu calisiyor (sunucu yok: baglanti hatasi uyarisi var)' $hasRetryWarn
 }
 catch {
     $script:ok = $false
