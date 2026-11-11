@@ -25,7 +25,7 @@ public sealed record AgentOptions(
                     service = true;
                     break;
                 case "--server":
-                    server = Value(args, ref i);
+                    server = ValidateServerUrl(Value(args, ref i));
                     break;
                 case "--token-file":
                     tokenFile = Value(args, ref i);
@@ -40,7 +40,7 @@ public sealed record AgentOptions(
                     tokenReader = Value(args, ref i);
                     break;
                 case "--server-pin":
-                    pins.Add(Value(args, ref i));
+                    pins.Add(ValidateServerPin(Value(args, ref i)));
                     break;
                 case "--allow-insecure-loopback":
 #if DEBUG
@@ -61,5 +61,33 @@ public sealed record AgentOptions(
     {
         if (i + 1 >= args.Length) throw new ArgumentException($"{args[i]} icin deger gerekli.");
         return args[++i];
+    }
+
+    private static string ValidateServerUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            throw new ArgumentException($"Gecersiz sunucu adresi (mutlak URL gerekli): {url}");
+
+        if (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)
+            throw new ArgumentException($"Sunucu adresi yalnizca http veya https olabilir: {url}");
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+            throw new ArgumentException($"Sunucu adresi kullanici bilgisi (userinfo) iceremez: {url}");
+
+        return url;
+    }
+
+    private static string ValidateServerPin(string pin)
+    {
+        const string prefix = "sha256/";
+        if (!pin.StartsWith(prefix, StringComparison.Ordinal))
+            throw new ArgumentException($"Sunucu pin'i 'sha256/' ile baslamalidir: {pin}");
+
+        var b64 = pin[prefix.Length..];
+        Span<byte> buffer = stackalloc byte[32];
+        if (!Convert.TryFromBase64String(b64, buffer, out var bytesWritten) || bytesWritten != 32)
+            throw new ArgumentException($"Sunucu pin'i 32 baytlik gecerli bir Base64 SHA-256 degeri olmalidir: {pin}");
+
+        return pin;
     }
 }
