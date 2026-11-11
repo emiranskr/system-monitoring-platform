@@ -19,9 +19,20 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
             return;
         }
 
+        await Task.Yield(); // host baslatmasini asenkron birak
+
+        var dataDir = AgentPaths.DataDir(options);
+        using var instanceLock = InstanceLock.TryAcquire(dataDir);
+        if (instanceLock is null)
+        {
+            log.LogError("Bu veri dizini ({DataDir}) icin baska bir sysmon ornegi calisiyor; kilit alinamadi. Agent durduruluyor.", dataDir);
+            return;
+        }
+
         var spool = new Spool(AgentPaths.SpoolDir(options),
             new SpoolLimits(MaxBytes: 50L * 1024 * 1024, MaxAge: TimeSpan.FromHours(24), SegmentBytes: 1024 * 1024),
-            () => DateTimeOffset.UtcNow);
+            () => DateTimeOffset.UtcNow,
+            onDropped: n => log.LogWarning("Spool boyutu veya yas siniri asildi: {Count} eski batch atildi.", n));
 
         using var cpu = new PdhCpuSource();
         var runner = new CollectorRunner(
@@ -43,19 +54,19 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
         if (options.Server is not null)
         {
             var store = new TokenStore(AgentPaths.TokenStorePath(options));
-            if (!store.TryLoad(out _))
-            {
-                log.LogError("Korumali token deposu yok veya okunamadi ({Path}); --import-token ile token iceri aktarin. Yukleme kapali, ornekler spool a yaziliyor.", store.Path);
-            }
-            else
-            {
-                var uploader = new Uploader(spool, HttpClients.Create(options.ServerPins), new Uri(options.Server),
-                    () => ReadToken(store),
-                    options, () => DateTimeOffset.UtcNow);
-                log.LogInformation("Yukleme etkin: sunucu {Server}, SPKI pin sayisi {Pins}, korumali token okundu.",
-                    options.Server, options.ServerPins?.Count ?? 0);
-                tasks.Add(UploadLoop(uploader, stoppingToken));
-            }
+            // Token gecidi kaldirildi: baslangicta token olmasa bile yukleme dongusu baslatilir;
+            // token daha sonra aktarildiginda veya degistiginde (401/403 5 dk aralikla denenirken)
+            // servis yeniden baslatilmadan toparlanir.
+            var uploader = new Uploader(spool, HttpClients.Create(options.ServerPins), new Uri(options.Server),
+                () => ReadToken(store),
+                options, () => DateTimeOffset.UtcNow);
+
+            uploader.BatchDropped += (batch, status) =>
+                log.LogWarning("Zehirli batch atildi: seq {Seq}, durum {Status}. Spool kuyrugu temizlendi.", batch.Seq, status);
+
+            log.LogInformation("Yukleme etkin: sunucu {Server}, SPKI pin sayisi {Pins}.",
+                options.Server, options.ServerPins?.Count ?? 0);
+            tasks.Add(UploadLoop(uploader, stoppingToken));
         }
         else
         {
@@ -67,7 +78,7 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
 
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private static string ReadToken(TokenStore store) =>
-        store.TryLoad(out var t) ? t! : throw new InvalidOperationException("Token okunamadi.");
+        store.TryLoad(out var t) ? t! : "";
 
     private async Task UploadLoop(Uploader uploader, CancellationToken ct)
     {

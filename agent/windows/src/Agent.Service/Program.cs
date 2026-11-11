@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using SysMon.Agent;
 using SysMon.Agent.Transport;
 
@@ -28,7 +29,7 @@ if (options.ImportToken is not null)
         Console.WriteLine($"Token korumali depoya yazildi: {store.Path}");
         return 0;
     }
-    catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException or UnauthorizedAccessException)
+    catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException or UnauthorizedAccessException or CryptographicException)
     {
         Console.Error.WriteLine($"Token iceri aktarilamadi: {ex.Message}");
         return 1;

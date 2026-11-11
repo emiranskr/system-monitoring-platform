@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Hosting;
 using SysMon.Agent;
+using SysMon.Agent.Transport;
 
 namespace Agent.Tests;
 
@@ -35,5 +36,21 @@ public sealed class HostTests : IDisposable
         var text = string.Concat(segs.Select(File.ReadAllText));
         Assert.Contains("mem.used_pct", text);
         Assert.Contains("disk.C.used_pct", text);
+    }
+
+    [Fact]
+    public async Task Host_baska_ornek_calisiyorsa_InstanceLock_nedeniyle_guvenle_durur()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var existingLock = InstanceLock.TryAcquire(_dataDir);
+        Assert.NotNull(existingLock);
+
+        using var host = AgentHost.Build(new AgentOptions(false, false, DataDir: _dataDir), []);
+        // Host baslatildiginda kilit alamayacagi icin ExecuteAsync hemen sonlanmali ve spool olusmamali
+        await host.StartAsync();
+        await Task.Delay(500);
+        await host.StopAsync();
+
+        Assert.False(Directory.Exists(Path.Combine(_dataDir, "spool")));
     }
 }
