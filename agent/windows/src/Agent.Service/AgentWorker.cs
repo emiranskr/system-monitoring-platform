@@ -45,7 +45,7 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
             else
             {
                 var uploader = new Uploader(spool, HttpClients.Create(options.ServerPins), new Uri(options.Server),
-                    () => store.TryLoad(out var t) ? t! : throw new InvalidOperationException("Token okunamadi."),
+                    () => ReadToken(store),
                     options, () => DateTimeOffset.UtcNow);
                 tasks.Add(UploadLoop(uploader, stoppingToken));
             }
@@ -57,6 +57,10 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
 
         await Task.WhenAll(tasks);
     }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static string ReadToken(TokenStore store) =>
+        store.TryLoad(out var t) ? t! : throw new InvalidOperationException("Token okunamadi.");
 
     private async Task UploadLoop(Uploader uploader, CancellationToken ct)
     {
