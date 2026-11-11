@@ -39,6 +39,7 @@ public static class Backoff
 public sealed class Uploader
 {
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+    private static readonly TimeSpan MaxClockOffset = TimeSpan.FromDays(366);
 
     private readonly Spool _spool;
     private readonly HttpClient _http;
@@ -89,7 +90,7 @@ public sealed class Uploader
 
             if (status == 409) // saat sapmasi: server_time ile ofset ogren, ayni batch yeniden denenir
             {
-                if (TryGetServerTime(text, out var st)) _spool.SetClockOffset(st - _now());
+                TryApplyServerTime(text);
                 return UploadOutcome.Retry;
             }
             if (status != 200) return UploadOutcome.Retry; // 429, 5xx ve beklenmeyen kodlar
@@ -117,7 +118,7 @@ public sealed class Uploader
             if (ack < batch.Seq) return UploadOutcome.Retry; // onaylanmadi: batch silinmez
 
             RejectedSamples += rejected;
-            if (TryGetServerTime(text, out var serverTime)) _spool.SetClockOffset(serverTime - _now());
+            TryApplyServerTime(text);
             _spool.Ack(batch);
             return UploadOutcome.Acked;
         }
@@ -148,14 +149,26 @@ public sealed class Uploader
         return content;
     }
 
+    private void TryApplyServerTime(string json)
+    {
+        if (!TryGetServerTime(json, out var st)) return;
+        var diff = st - _now();
+        if (diff.Duration() > MaxClockOffset) return;
+        _spool.SetClockOffset(diff);
+    }
+
     private static bool TryGetServerTime(string json, out DateTimeOffset value)
     {
         value = default;
         try
         {
             using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.TryGetProperty("server_time", out var el)
-                   && DateTimeOffset.TryParse(el.GetString(), out value);
+            if (!doc.RootElement.TryGetProperty("server_time", out var el) || el.ValueKind != JsonValueKind.String)
+                return false;
+            var str = el.GetString();
+            if (string.IsNullOrWhiteSpace(str)) return false;
+            return DateTimeOffset.TryParse(str, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out value);
         }
         catch (JsonException) { return false; }
     }

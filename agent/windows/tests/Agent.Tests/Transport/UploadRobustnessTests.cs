@@ -78,6 +78,80 @@ public sealed class UploadRobustnessTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task K2_Asiri_server_time_ofseti_yok_sayilir_yukleme_hatti_kilitlenmez()
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        spool.Enqueue(One(1));
+        _srv.Respond = b => (200, $"{{\"ack_seq\":{b.GetProperty("seq").GetInt64()},\"rejected\":0,\"server_time\":\"9999-12-31T00:00:00Z\"}}");
+        var up = NewUploader(spool);
+
+        Assert.Equal(UploadOutcome.Acked, await up.UploadOnceAsync(default));
+        Assert.Equal(TimeSpan.Zero, spool.ClockOffset); // makul sinirin disinda: uygulanmadi
+
+        spool.Enqueue(One(2)); // sonraki yukleme ArgumentOutOfRange ile cokmemeli
+        Assert.Equal(UploadOutcome.Acked, await up.UploadOnceAsync(default));
+    }
+
+    [Fact]
+    public async Task K2_409_ile_gelen_asiri_server_time_yok_sayilir()
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        spool.Enqueue(One(1));
+        _srv.Respond = _ => (409, "{\"error\":\"clock_skew\",\"server_time\":\"9999-12-31T00:00:00Z\"}");
+        Assert.Equal(UploadOutcome.Retry, await NewUploader(spool).UploadOnceAsync(default));
+        Assert.Equal(TimeSpan.Zero, spool.ClockOffset);
+    }
+
+    [Fact]
+    public async Task K2_Makul_ofset_uygulanir_366_gun_siniri_icinde()
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        spool.Enqueue(One(1));
+        _srv.Respond = _ => (409, "{\"error\":\"clock_skew\",\"server_time\":\"2026-11-11T09:10:00Z\"}");
+        Assert.Equal(UploadOutcome.Retry, await NewUploader(spool).UploadOnceAsync(default));
+        Assert.Equal(TimeSpan.FromMinutes(10), spool.ClockOffset);
+    }
+
+    [Theory]
+    [InlineData("12345")]
+    [InlineData("true")]
+    [InlineData("null")]
+    [InlineData("\"bu bir tarih degil\"")]
+    public async Task K2_server_time_beklenmeyen_tipte_olsa_da_istisna_firlatmaz(string rawServerTime)
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        var b = spool.Enqueue(One(1));
+        _srv.Respond = _ => (200, $"{{\"ack_seq\":{b.Seq},\"rejected\":0,\"server_time\":{rawServerTime}}}");
+        Assert.Equal(UploadOutcome.Acked, await NewUploader(spool).UploadOnceAsync(default));
+        Assert.Equal(TimeSpan.Zero, spool.ClockOffset);
+
+        spool.Enqueue(One(2));
+        _srv.Respond = _ => (409, $"{{\"server_time\":{rawServerTime}}}");
+        Assert.Equal(UploadOutcome.Retry, await NewUploader(spool).UploadOnceAsync(default));
+    }
+
+    [Fact]
+    public async Task K2_Saat_dilimi_eki_olmayan_server_time_UTC_sayilir_Turkce_yerel_ayarda_bile()
+    {
+        var old = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("tr-TR");
+        try
+        {
+            await _srv.StartAsync();
+            var spool = NewSpool();
+            spool.Enqueue(One(1));
+            _srv.Respond = _ => (409, "{\"server_time\":\"2026-11-11T09:10:00\"}"); // 'Z' yok
+            Assert.Equal(UploadOutcome.Retry, await NewUploader(spool).UploadOnceAsync(default));
+            Assert.Equal(TimeSpan.FromMinutes(10), spool.ClockOffset); // yerel saat dilimi (UTC+3) kaymasi olmamali
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = old; }
+    }
+
+    [Fact]
     public async Task O11_Yerel_ayar_ar_SA_ve_th_TH_olsa_bile_zaman_damgalari_Gregoryen_ASCII_ISO_formatinda()
     {
         var old = System.Globalization.CultureInfo.CurrentCulture;
