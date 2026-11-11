@@ -62,6 +62,7 @@ public sealed class SystemNetworkSource : INetworkSource
 /// (ornegin Turkce) sayac adlari farkli oldugundan PerformanceCounter sinifi guvenilmezdir.
 /// Baslatma hatasi (ornegin dusuk yetkili hesapta sayac erisimi yok) istisna FIRLATMAZ: Error doner,
 /// okuma null verir ve baslatma 60 sn'de bir yeniden denenir. Boylece bir collector tum servisi dusurmez.
+/// PdhCollectQueryData basarisiz olursa sorgu kapatilir ve 60 sn sonra otomatik yeniden baslatilir.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class PdhCpuSource : ICpuSource, IDisposable
@@ -115,13 +116,20 @@ public sealed class PdhCpuSource : ICpuSource, IDisposable
             TryInit();
             if (_query == IntPtr.Zero) return null;
         }
-        if (PdhCollectQueryData(_query) != 0) return null;
+        var collectSt = PdhCollectQueryData(_query);
+        if (collectSt != 0)
+        {
+            Error = $"PdhCollectQueryData basarisiz: 0x{collectSt:X8}";
+            Close();
+            return null;
+        }
         if (!_primed)
         {
             _primed = true; // hiz sayaci icin ilk ornek yalnizca baseline
             return null;
         }
-        if (PdhGetFormattedCounterValue(_counter, PdhFmtDouble, out _, out var v) != 0 || v.CStatus != 0) return null;
+        var fmtSt = PdhGetFormattedCounterValue(_counter, PdhFmtDouble, out _, out var v);
+        if (fmtSt != 0 || v.CStatus != 0) return null;
         return v.DoubleValue;
     }
 

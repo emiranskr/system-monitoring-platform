@@ -27,6 +27,31 @@ function Get-LocalGroupNameBySid([string]$sid) {
     return $full.Split('\')[-1]
 }
 
+# Yol temizligi: sondaki ters boluler tirnak kacirma ve komut satiri bozulmalarini onlemek icin temizlenir
+$SourceDir = $SourceDir.TrimEnd('\')
+$InstallDir = $InstallDir.TrimEnd('\')
+$DataDir = $DataDir.TrimEnd('\')
+
+# O9: Sunucu adresi ve SPKI pin bicim dogrulamalari
+if ($Server) {
+    $uri = $null
+    if (-not [Uri]::TryCreate($Server, [UriKind]::Absolute, [ref]$uri) -or ($uri.Scheme -notin 'http', 'https') -or (-not [string]::IsNullOrEmpty($uri.UserInfo))) {
+        throw "Gecersiz -Server adresi: $Server (mutlak http/https URL ve kullanici bilgisiz olmalidir)"
+    }
+}
+foreach ($p in $ServerPin) {
+    if (-not $p.StartsWith('sha256/')) {
+        throw "Gecersiz -ServerPin bicimi ('sha256/' ile baslamali): $p"
+    }
+    $b64 = $p.Substring(7)
+    try {
+        $bytes = [Convert]::FromBase64String($b64)
+        if ($bytes.Length -ne 32) { throw "32 bayt degil" }
+    } catch {
+        throw "Gecersiz -ServerPin Base64 SHA-256 degeri: $p"
+    }
+}
+
 if (-not (Test-Path (Join-Path $SourceDir 'Agent.Service.exe'))) { throw "Agent.Service.exe bulunamadi: $SourceDir" }
 $account = "NT SERVICE\$ServiceName"
 
@@ -56,10 +81,13 @@ if ($existing) {
 }
 # Dusuk yetkili sanal hesap + yalniz kendi SID'i icin kisitlama yok (sanal hesabin dosya ACL'i icin servis SID'i gerekir)
 & sc.exe config $ServiceName obj= $account | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "sc config obj= basarisiz (cikis: $LASTEXITCODE)" }
 & sc.exe sidtype $ServiceName unrestricted | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "sc sidtype basarisiz (cikis: $LASTEXITCODE)" }
 & sc.exe config $ServiceName start= delayed-auto | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "sc config start= basarisiz (cikis: $LASTEXITCODE)" }
 & sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/15000/restart/60000 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'sc failure basarisiz' }
+if ($LASTEXITCODE -ne 0) { throw "sc failure basarisiz (cikis: $LASTEXITCODE)" }
 
 # 4) Veri dizini: miras kapali; SYSTEM + Administrators tam, servis hesabi Modify. Users/Everyone YOK.
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
