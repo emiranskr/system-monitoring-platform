@@ -159,3 +159,45 @@ public sealed class TokenStoreTests : IDisposable
         return -1;
     }
 }
+
+public sealed class TokenStoreExtraPrincipalTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "sysmon-tokx-" + Guid.NewGuid().ToString("N"));
+    private string StorePath => Path.Combine(_dir, "identity", "token.bin");
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_dir)) Directory.Delete(_dir, true);
+    }
+
+    [Fact]
+    public void Ek_hesap_ACLe_degistirme_yetkisiyle_eklenir_ve_genis_gruplar_yine_yok()
+    {
+        var store = new TokenStore(StorePath, [@"BUILTIN\Backup Operators"]);
+        store.Save("tok_ek_hesap_testi_0123456789abcdef");
+
+        var rules = new FileInfo(StorePath).GetAccessControl()
+            .GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+            .Cast<System.Security.AccessControl.FileSystemAccessRule>()
+            .Where(r => r.AccessControlType == System.Security.AccessControl.AccessControlType.Allow)
+            .ToList();
+        var backup = rules.Single(r => ((System.Security.Principal.SecurityIdentifier)r.IdentityReference).Value == "S-1-5-32-551");
+        Assert.True(backup.FileSystemRights.HasFlag(System.Security.AccessControl.FileSystemRights.Modify));
+        Assert.DoesNotContain(rules, r => ((System.Security.Principal.SecurityIdentifier)r.IdentityReference).Value is "S-1-1-0" or "S-1-5-32-545" or "S-1-5-11");
+    }
+
+    [Fact]
+    public void Bilinmeyen_hesap_adi_ArgumentException_firlatir_ve_dosya_olusmaz()
+    {
+        var store = new TokenStore(StorePath, [@"NT SERVICE\OlmayanServis" + Guid.NewGuid().ToString("N")]);
+        Assert.Throws<ArgumentException>(() => store.Save("tok_x_0123456789abcdef0123456789"));
+        Assert.False(File.Exists(StorePath));
+    }
+
+    [Fact]
+    public void Parse_token_reader_secenegini_okur()
+    {
+        var o = AgentOptions.Parse(["--import-token", "t.txt", "--token-reader", @"NT SERVICE\SysMonAgent"]);
+        Assert.Equal(@"NT SERVICE\SysMonAgent", o.TokenReader);
+    }
+}

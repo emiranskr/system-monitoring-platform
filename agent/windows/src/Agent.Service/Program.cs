@@ -22,7 +22,8 @@ if (options.ImportToken is not null)
     }
     try
     {
-        var store = new TokenStore(AgentPaths.TokenStorePath(options));
+        var store = new TokenStore(AgentPaths.TokenStorePath(options),
+            options.TokenReader is null ? null : [options.TokenReader]);
         TokenImporter.Import(options.ImportToken, store);
         Console.WriteLine($"Token korumali depoya yazildi: {store.Path}");
         return 0;

@@ -60,11 +60,20 @@ public sealed class SystemNetworkSource : INetworkSource
 /// <summary>
 /// PDH ile CPU kullanimi. PdhAddEnglishCounter kullanilir: yerellestirilmis Windows'ta
 /// (ornegin Turkce) sayac adlari farkli oldugundan PerformanceCounter sinifi guvenilmezdir.
+/// Baslatma hatasi (ornegin dusuk yetkili hesapta sayac erisimi yok) istisna FIRLATMAZ: Error doner,
+/// okuma null verir ve baslatma 60 sn'de bir yeniden denenir. Boylece bir collector tum servisi dusurmez.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class PdhCpuSource : ICpuSource, IDisposable
 {
     private const uint PdhFmtDouble = 0x00000200;
+    private const long RetryMs = 60_000;
+
+    private static readonly string[] DefaultPaths =
+    [
+        @"\Processor Information(_Total)\% Processor Utility", // Win10+: Gorev Yoneticisi ile ayni olcu
+        @"\Processor(_Total)\% Processor Time",                // klasik yedek
+    ];
 
     [StructLayout(LayoutKind.Explicit)]
     private struct FmtCounterValue
@@ -84,20 +93,28 @@ public sealed class PdhCpuSource : ICpuSource, IDisposable
     [DllImport("pdh.dll")]
     private static extern uint PdhCloseQuery(IntPtr query);
 
-    private readonly IntPtr _query;
-    private readonly IntPtr _counter;
+    private readonly IReadOnlyList<string> _paths;
+    private IntPtr _query;
+    private IntPtr _counter;
     private bool _primed;
+    private long _lastInitMs = long.MinValue;
 
-    public PdhCpuSource()
+    public string? Error { get; private set; }
+
+    public PdhCpuSource(IReadOnlyList<string>? counterPaths = null)
     {
-        Check(PdhOpenQueryW(null, IntPtr.Zero, out _query), "PdhOpenQuery");
-        // Win10+: Gorev Yoneticisi ile ayni olcu. Yoksa klasik sayaca dus.
-        if (PdhAddEnglishCounterW(_query, @"\Processor Information(_Total)\% Processor Utility", IntPtr.Zero, out _counter) != 0)
-            Check(PdhAddEnglishCounterW(_query, @"\Processor(_Total)\% Processor Time", IntPtr.Zero, out _counter), "PdhAddEnglishCounter");
+        _paths = counterPaths ?? DefaultPaths;
+        TryInit();
     }
 
     public double? ReadUtilizationPercent()
     {
+        if (_query == IntPtr.Zero)
+        {
+            if (Environment.TickCount64 - _lastInitMs < RetryMs) return null;
+            TryInit();
+            if (_query == IntPtr.Zero) return null;
+        }
         if (PdhCollectQueryData(_query) != 0) return null;
         if (!_primed)
         {
@@ -108,10 +125,41 @@ public sealed class PdhCpuSource : ICpuSource, IDisposable
         return v.DoubleValue;
     }
 
-    private static void Check(uint status, string op)
+    private void TryInit()
     {
-        if (status != 0) throw new InvalidOperationException($"{op} basarisiz: 0x{status:X8}");
+        _lastInitMs = Environment.TickCount64;
+        Close();
+        var open = PdhOpenQueryW(null, IntPtr.Zero, out var q);
+        if (open != 0)
+        {
+            Error = $"PdhOpenQuery basarisiz: 0x{open:X8}";
+            return;
+        }
+
+        var errors = new List<string>();
+        foreach (var path in _paths)
+        {
+            var st = PdhAddEnglishCounterW(q, path, IntPtr.Zero, out var c);
+            if (st == 0)
+            {
+                _query = q;
+                _counter = c;
+                _primed = false;
+                Error = null;
+                return;
+            }
+            errors.Add($"{path} -> 0x{st:X8}");
+        }
+        PdhCloseQuery(q);
+        Error = "PdhAddEnglishCounter basarisiz: " + string.Join("; ", errors);
     }
 
-    public void Dispose() => PdhCloseQuery(_query);
+    private void Close()
+    {
+        if (_query != IntPtr.Zero) PdhCloseQuery(_query);
+        _query = IntPtr.Zero;
+        _counter = IntPtr.Zero;
+    }
+
+    public void Dispose() => Close();
 }

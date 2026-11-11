@@ -78,3 +78,46 @@ public class OptionsParseTests
         Assert.Throws<ArgumentException>(() => AgentOptions.Parse(["--server"]));
     }
 }
+
+public sealed class PipelineStatusTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "sysmon-pst-" + Guid.NewGuid().ToString("N"));
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_dir)) Directory.Delete(_dir, true);
+    }
+
+    private sealed class Flaky : ICollector
+    {
+        public int Calls;
+        public string Name => "flaky";
+        public TimeSpan Interval => TimeSpan.FromMilliseconds(10);
+        public Task<IReadOnlyDictionary<string, double?>> CollectAsync(CancellationToken ct)
+        {
+            var n = Interlocked.Increment(ref Calls);
+            // 1-4. cagri hata, sonra duzelir
+            if (n <= 4) throw new InvalidOperationException("erisim reddedildi");
+            return Task.FromResult<IReadOnlyDictionary<string, double?>>(new Dictionary<string, double?> { ["cpu.total"] = 5 });
+        }
+    }
+
+    [Fact]
+    public async Task Collector_durum_degisimi_bir_kez_bildirilir_tekrarlayan_hata_spamlanmaz_ve_duzelme_bildirilir()
+    {
+        var spool = new Spool(_dir, new SpoolLimits(50_000_000, TimeSpan.FromHours(24), 1_000_000), () => DateTimeOffset.UtcNow);
+        var events = new List<(string Name, bool Ok, string? Msg)>();
+        var pipeline = new SamplingPipeline(new CollectorRunner([new Flaky()], TimeSpan.FromSeconds(1)), spool,
+            () => DateTimeOffset.UtcNow, TimeSpan.FromMilliseconds(10), TimeSpan.FromHours(1),
+            onStatusChange: s => events.Add((s.Name, s.Ok, s.Message)));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(400));
+        await pipeline.RunAsync(cts.Token);
+
+        // 4 ardisik hata -> yalnizca 1 "hata" bildirimi; sonra duzelme -> 1 "ok" bildirimi
+        Assert.Equal(2, events.Count);
+        Assert.False(events[0].Ok);
+        Assert.Contains("erisim reddedildi", events[0].Msg);
+        Assert.True(events[1].Ok);
+    }
+}

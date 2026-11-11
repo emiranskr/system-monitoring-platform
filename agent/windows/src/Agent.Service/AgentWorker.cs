@@ -32,7 +32,12 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
             new NetworkCollector(new SystemNetworkSource(), () => Environment.TickCount64),
         ], TimeSpan.FromSeconds(2));
 
-        var pipeline = new SamplingPipeline(runner, spool, () => DateTimeOffset.UtcNow, SampleInterval, BatchInterval);
+        var pipeline = new SamplingPipeline(runner, spool, () => DateTimeOffset.UtcNow, SampleInterval, BatchInterval,
+            onStatusChange: st =>
+            {
+                if (st.Ok) log.LogInformation("Collector {Name} duzeldi.", st.Name);
+                else log.LogWarning("Collector {Name} calismiyor: {Message}", st.Name, st.Message);
+            });
         var tasks = new List<Task> { pipeline.RunAsync(stoppingToken) };
 
         if (options.Server is not null)

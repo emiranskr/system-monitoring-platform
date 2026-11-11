@@ -14,7 +14,7 @@ namespace SysMon.Agent.Transport;
 /// koruma baska kullanicilara ve diske duz metin yazilmasina karsidir (bkz. proposal.md Bolum 10.3).
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class TokenStore(string path)
+public sealed class TokenStore(string path, IReadOnlyList<string>? extraAccounts = null)
 {
     // Uygulamaya ozgu entropi: ayni makinede baska uygulamalarin blobunu cozmesini zorlastirir.
     private static readonly byte[] Entropy = "SysMon.Agent.TokenStore.v1"u8.ToArray();
@@ -25,6 +25,9 @@ public sealed class TokenStore(string path)
     public void Save(string token)
     {
         if (string.IsNullOrWhiteSpace(token)) throw new ArgumentException("Token bos olamaz.", nameof(token));
+
+        // Hesap adlari dosya olusturulmadan once cozumlenir: bilinmeyen hesap yarim kalmis dosya birakmaz.
+        var extra = ResolveAccounts(extraAccounts);
 
         var dir = System.IO.Path.GetDirectoryName(Path)!;
         Directory.CreateDirectory(dir);
@@ -40,7 +43,7 @@ public sealed class TokenStore(string path)
             // Dosya, ACL kisitlanmadan once hic icerik tasimaz: bos olustur, ACL uygula, sonra yaz.
             using (var fs = new FileStream(tmp, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None))
             {
-                RestrictAcl(new FileInfo(tmp));
+                RestrictAcl(new FileInfo(tmp), extra);
                 fs.Write(payload);
                 fs.Flush(true);
             }
@@ -108,7 +111,26 @@ public sealed class TokenStore(string path)
         }
     }
 
-    private static void RestrictAcl(FileInfo file)
+    private static List<SecurityIdentifier> ResolveAccounts(IReadOnlyList<string>? accounts)
+    {
+        var result = new List<SecurityIdentifier>();
+        foreach (var a in accounts ?? [])
+        {
+            try
+            {
+                result.Add(a.StartsWith("S-1-", StringComparison.Ordinal)
+                    ? new SecurityIdentifier(a)
+                    : (SecurityIdentifier)new NTAccount(a).Translate(typeof(SecurityIdentifier)));
+            }
+            catch (Exception ex) when (ex is IdentityNotMappedException or ArgumentException or SystemException)
+            {
+                throw new ArgumentException($"Hesap cozumlenemedi: {a}", nameof(accounts), ex);
+            }
+        }
+        return result;
+    }
+
+    private static void RestrictAcl(FileInfo file, IReadOnlyList<SecurityIdentifier> extra)
     {
         var security = new FileSecurity();
         security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
@@ -118,6 +140,7 @@ public sealed class TokenStore(string path)
         Allow(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
         var current = WindowsIdentity.GetCurrent().User;
         if (current is not null) Allow(current); // token'i yazan/okuyan hesap (servis hesabi veya gelistirici)
+        foreach (var sid in extra) Allow(sid);   // ornegin NT SERVICESysMonAgent: okuma + rotasyonda degistirme
         file.SetAccessControl(security);
     }
 }

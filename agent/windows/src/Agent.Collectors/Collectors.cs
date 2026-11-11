@@ -80,7 +80,13 @@ public sealed class NetworkCollector(INetworkSource source, Func<long> nowMs) : 
     }
 }
 
-public interface ICpuSource { double? ReadUtilizationPercent(); }
+public interface ICpuSource
+{
+    double? ReadUtilizationPercent();
+
+    /// <summary>Kaynak baslatilamadiysa/okunamiyorsa neden; aksi halde null.</summary>
+    string? Error => null;
+}
 
 public sealed class CpuCollector(ICpuSource source) : ICollector
 {
@@ -91,6 +97,8 @@ public sealed class CpuCollector(ICpuSource source) : ICollector
     {
         // "% Processor Utility" turbo nedeniyle 100'u asabilir; Gorev Yoneticisi gibi 100'e kirpilir.
         var v = source.ReadUtilizationPercent();
+        // Kaynak kullanilamiyorsa (ornegin sayac erisimi yok) metrik uretme; runner bunu collector_status hatasi olarak raporlar.
+        if (v is null && source.Error is { } err) throw new InvalidOperationException(err);
         var d = new Dictionary<string, double?> { ["cpu.total"] = v is null ? null : Math.Clamp(v.Value, 0, 100) };
         return Task.FromResult<IReadOnlyDictionary<string, double?>>(d);
     }

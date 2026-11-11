@@ -1,0 +1,144 @@
+#Requires -RunAsAdministrator
+<#
+.SYNOPSIS
+  A5 dogrulamasi: servisi GERCEK Windows'ta kurar, dusuk yetkili hesapta calistigini, PDH izin matrisini,
+  token deposu ACL'ini, kurtarma eylemini kanitlar; sonra her seyi siler. Cikti $LogPath dosyasina yazilir.
+#>
+param(
+    [Parameter(Mandatory)][string]$PublishDir,
+    [Parameter(Mandatory)][string]$LogPath
+)
+$ErrorActionPreference = 'Stop'
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$svcName = 'SysMonAgentVerify'
+$account = "NT SERVICE\$svcName"
+$installDir = Join-Path $env:ProgramFiles 'SysMon-verify\Agent'
+$dataDir = Join-Path $env:ProgramData 'SysMon-verify\agent'
+$script:ok = $true
+
+function Log([string]$m) { Add-Content -Path $LogPath -Value ("[{0:HH:mm:ss}] {1}" -f (Get-Date), $m) -Encoding UTF8 }
+function Check([string]$name, [bool]$cond, [string]$detail = '') {
+    if (-not $cond) { $script:ok = $false }
+    Log ("{0,-6} {1} {2}" -f ($(if ($cond) { 'GECTI' } else { 'KALDI' }), $name, $detail))
+}
+function Read-Spool([string]$dir) {
+    $metrics = @{}
+    $files = Get-ChildItem (Join-Path $dir 'spool') -Filter 'seg-*' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '\.tmp$' }
+    foreach ($f in $files) {
+        if ($f.Name -like '*.gz') {
+            $fs = [IO.File]::OpenRead($f.FullName); $gz = New-Object IO.Compression.GZipStream($fs, [IO.Compression.CompressionMode]::Decompress)
+            $sr = New-Object IO.StreamReader($gz); $lines = @(); while ($null -ne ($l = $sr.ReadLine())) { $lines += $l }; $sr.Dispose()
+        } else {
+            $fs = New-Object IO.FileStream($f.FullName, 'Open', 'Read', 'ReadWrite'); $sr = New-Object IO.StreamReader($fs)
+            $lines = @(); while ($null -ne ($l = $sr.ReadLine())) { $lines += $l }; $sr.Dispose()
+        }
+        foreach ($line in $lines) {
+            try { $b = $line | ConvertFrom-Json } catch { continue }
+            foreach ($s in $b.Samples) { foreach ($p in $s.M.PSObject.Properties) {
+                if (-not $metrics.ContainsKey($p.Name)) { $metrics[$p.Name] = @{ dolu = 0; bos = 0 } }
+                if ($null -eq $p.Value) { $metrics[$p.Name].bos++ } else { $metrics[$p.Name].dolu++ }
+            } }
+        }
+    }
+    return $metrics
+}
+function Summarize($m) { ($m.Keys | Sort-Object | ForEach-Object { "{0}=dolu{1}/bos{2}" -f $_, $m[$_].dolu, $m[$_].bos }) -join '; ' }
+function Install([switch]$Perf, [string]$Server) {
+    $a = @{ SourceDir = $PublishDir; InstallDir = $installDir; DataDir = $dataDir; ServiceName = $svcName; StartService = $true }
+    if ($Perf) { $a.AddToPerfMonUsers = $true }
+    if ($Server) { $a.Server = $Server }
+    & (Join-Path $here 'Install-SysMonService.ps1') @a | Out-Null
+}
+
+Set-Content -Path $LogPath -Value "A5 dogrulamasi basladi $(Get-Date -Format o) | yonetici=$(([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))" -Encoding UTF8
+try {
+    # --- Asama 1: PDH, performans grubu OLMADAN ---
+    Install
+    Start-Sleep -Seconds 25
+    $svc = Get-CimInstance Win32_Service -Filter "Name='$svcName'"
+    Check 'Servis calisiyor' ($svc.State -eq 'Running') "durum=$($svc.State)"
+    Check 'Servis hesabi sanal hesap (LocalSystem DEGIL)' ($svc.StartName -eq $account) "StartName=$($svc.StartName)"
+    $proc = Get-Process -Id $svc.ProcessId -IncludeUserName
+    Check 'Surec kullanicisi servis hesabi' ($proc.UserName -eq $account) "UserName=$($proc.UserName)"
+    $m1 = Read-Spool $dataDir
+    Log "Spool (grupsuz): $(Summarize $m1)"
+    $cpuOk1 = $m1.ContainsKey('cpu.total') -and $m1['cpu.total'].dolu -gt 0
+    Log "BILGI PDH CPU, Performance Monitor Users uyeligi OLMADAN okunuyor mu: $cpuOk1"
+    $agentLog1 = Get-Content (Join-Path $dataDir 'logs' | Join-Path -ChildPath 'agent.log') -ErrorAction SilentlyContinue
+    foreach ($l in ($agentLog1 | Select-Object -First 6)) { Log "AGENTLOG $l" }
+    if (-not $cpuOk1) {
+        Check 'Grupsuz PDH basarisizsa servis yine de CALISIYOR (bozulmus mod) ve uyari gunlukte' ($svc.State -eq 'Running' -and [bool]($agentLog1 | Select-String 'Collector cpu calismiyor'))
+    }
+    Check 'Bellek ve disk metrikleri dolu' ($m1.ContainsKey('mem.used_pct') -and $m1['mem.used_pct'].dolu -gt 0 -and $m1.ContainsKey('disk.C.used_pct') -and $m1['disk.C.used_pct'].dolu -gt 0)
+
+    # --- ACL: servis hesabi program dizinine yazamamali ---
+    $instAcl = (Get-Acl $installDir).Access | ForEach-Object { "{0}:{1}:{2}" -f $_.IdentityReference, $_.AccessControlType, $_.FileSystemRights }
+    Log "Program dizini ACL: $($instAcl -join ' | ')"
+    Check 'Program dizininde servis hesabi icin acik yazma kurali yok' (-not ($instAcl | Where-Object { $_ -like "*$svcName*" }))
+    $dataAcl = (Get-Acl $dataDir).Access | ForEach-Object { "{0}:{1}" -f $_.IdentityReference, $_.FileSystemRights }
+    Log "Veri dizini ACL: $($dataAcl -join ' | ')"
+    Check 'Veri dizininde Users/Everyone yok' (-not ($dataAcl | Where-Object { $_ -match 'Everyone|BUILTIN\\Users|Herkes|Kullan' -and $_ -notmatch 'Performans' }))
+    $qf = (& sc.exe qfailure $svcName) -join ' '
+    Log "Kurtarma: $(($qf -replace '\s+', ' '))"
+    Check 'Kurtarma eylemi tanimli (RESTART)' ($qf -match 'RESTART')
+
+    # --- Kurtarma: sureci oldur, servis yeniden baslamali ---
+    $oldPid = $svc.ProcessId
+    Stop-Process -Id $oldPid -Force
+    Start-Sleep -Seconds 15
+    $svc2 = Get-CimInstance Win32_Service -Filter "Name='$svcName'"
+    Check 'Surec oldurulunca servis otomatik yeniden basladi' ($svc2.State -eq 'Running' -and $svc2.ProcessId -ne $oldPid -and $svc2.ProcessId -ne 0) "eskiPid=$oldPid yeniPid=$($svc2.ProcessId)"
+
+    # --- Asama 2: PDH, performans grubu ILE (karsilastirma) ---
+    Stop-Service $svcName -Force; (Get-Service $svcName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+    Remove-Item (Join-Path $dataDir 'spool') -Recurse -Force
+    Install -Perf
+    Start-Sleep -Seconds 25
+    $m2 = Read-Spool $dataDir
+    Log "Spool (grup ile): $(Summarize $m2)"
+    $cpuOk2 = $m2.ContainsKey('cpu.total') -and $m2['cpu.total'].dolu -gt 0
+    Check 'PDH CPU, Performance Monitor Users uyeligi ILE okunuyor' $cpuOk2
+    Log "PDH IZIN SONUCU: gruba uyelik $(if ($cpuOk1) { 'GEREKMIYOR (grupsuz de calisti)' } else { 'GEREKLI (grupsuz null, grupla dolu)' })"
+
+    # --- Asama 3: token deposu: DPAPI + ACL + servis hesabi okuyabiliyor mu ---
+    Stop-Service $svcName -Force; (Get-Service $svcName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+    $plain = Join-Path $env:TEMP "sysmon-bootstrap-$([guid]::NewGuid().ToString('N')).txt"
+    $secret = 'tok_' + [guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')
+    Set-Content -Path $plain -Value $secret -Encoding ASCII
+    $exe = Join-Path $installDir 'Agent.Service.exe'
+    $imp = & $exe --import-token $plain --token-reader $account --data-dir $dataDir 2>&1
+    Log "Import cikti: $imp (cikis=$LASTEXITCODE)"
+    Check 'Import basarili' ($LASTEXITCODE -eq 0)
+    Check 'Duz metin bootstrap dosyasi silindi' (-not (Test-Path $plain))
+    $tok = Join-Path $dataDir 'identity\token.bin'
+    $bytes = [IO.File]::ReadAllBytes($tok)
+    $needle = [Text.Encoding]::UTF8.GetBytes($secret)
+    $found = $false; for ($i = 0; $i + $needle.Length -le $bytes.Length; $i++) { $same = $true; for ($j = 0; $j -lt $needle.Length; $j++) { if ($bytes[$i + $j] -ne $needle[$j]) { $same = $false; break } }; if ($same) { $found = $true; break } }
+    Check 'token.bin duz metin token icermiyor' (-not $found)
+    $tokAcl = (Get-Acl $tok).Access | ForEach-Object { "{0}:{1}" -f $_.IdentityReference, $_.FileSystemRights }
+    Log "token.bin ACL: $($tokAcl -join ' | ')"
+    Check 'token.bin ACL: servis hesabi var, Users/Everyone yok' (($tokAcl | Where-Object { $_ -like "*$svcName*" }) -and -not ($tokAcl | Where-Object { $_ -match 'Everyone|BUILTIN\\Users|Herkes' }))
+
+    # Servis hesabi token'i okuyabiliyor mu? --server ile baslat (dinleyen sunucu yok: baglanti reddi = gecici hata beklenir)
+    $t0 = Get-Date
+    Install -Perf -Server 'https://127.0.0.1:59999'
+    Start-Sleep -Seconds 25
+    $ev = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $t0.AddSeconds(-2) } -ErrorAction SilentlyContinue |
+        Where-Object { $_.Message -match 'Yukleme|Korumali token|SysMon' } | Select-Object -First 8
+    foreach ($e in $ev) { Log ("OLAY [{0}] {1}: {2}" -f $e.LevelDisplayName, $e.ProviderName, (($e.Message -split "`n")[0])) }
+    Check 'Servis hesabi korumali token deposunu OKUYABILIYOR (token yok hatasi yok)' (-not ($ev | Where-Object { $_.Message -match 'Korumali token deposu yok' }))
+    $hasRetryWarn = [bool]($ev | Where-Object { $_.Message -match 'Yukleme basarisiz' })
+    Check 'Yukleme dongusu calisiyor (baglanti hatasi uyarisi var)' $hasRetryWarn
+}
+catch {
+    $script:ok = $false
+    Log "HATA: $($_.Exception.Message) @ $($_.InvocationInfo.ScriptLineNumber)"
+}
+finally {
+    try {
+        & (Join-Path $here 'Uninstall-SysMonService.ps1') -InstallDir $installDir -DataDir $dataDir -ServiceName $svcName -RemoveData | Out-Null
+        Check 'Temizlik: servis silindi' (-not (Get-Service $svcName -ErrorAction SilentlyContinue))
+        Check 'Temizlik: dizinler silindi' (-not (Test-Path $installDir) -and -not (Test-Path $dataDir))
+    } catch { Log "TEMIZLIK HATASI: $($_.Exception.Message)"; $script:ok = $false }
+    Log "BITTI sonuc=$(if ($script:ok) { 'BASARILI' } else { 'BASARISIZ' })"
+}
