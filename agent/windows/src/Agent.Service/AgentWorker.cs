@@ -71,39 +71,17 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
 
     private async Task UploadLoop(Uploader uploader, CancellationToken ct)
     {
-        var attempt = 0;
-        var rnd = new Random();
-        while (!ct.IsCancellationRequested)
-        {
-            try
+        var runner = new UploadRunner(uploader.UploadOnceAsync, Task.Delay, new Random(),
+            onWait: (outcome, wait) =>
             {
-                switch (await uploader.UploadOnceAsync(ct))
-                {
-                    case UploadOutcome.Acked:
-                        attempt = 0;
-                        break;
-                    case UploadOutcome.Idle:
-                        attempt = 0;
-                        await Task.Delay(TimeSpan.FromSeconds(1), ct);
-                        break;
-                    case UploadOutcome.Retry:
-                        var wait = Backoff.Next(attempt++, rnd);
-                        log.LogWarning("Yukleme basarisiz, {Wait:0.0} sn sonra yeniden denenecek.", wait.TotalSeconds);
-                        await Task.Delay(wait, ct);
-                        break;
-                    case UploadOutcome.TlsRejected:
-                        log.LogError("Sunucu sertifikasi dogrulanamadi (SPKI pin / sertifika). 5 dk sonra yeniden denenecek; veri ve token gonderilmedi.");
-                        await Task.Delay(Backoff.Cap, ct);
-                        break;
-                    case UploadOutcome.AuthFailed:
-                        log.LogError("Sunucu kimlik bilgisini reddetti (401/403). Yukleme durduruldu; ornekler spool'da korunuyor.");
-                        return;
-                }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                return;
-            }
-        }
+                if (outcome == UploadOutcome.TlsRejected)
+                    log.LogError("Sunucu sertifikasi dogrulanamadi (SPKI pin / sertifika); veri ve token gonderilmedi. {Wait:0} sn sonra yeniden denenecek.", wait.TotalSeconds);
+                else if (outcome == UploadOutcome.Retry)
+                    log.LogWarning("Yukleme basarisiz, {Wait:0.0} sn sonra yeniden denenecek.", wait.TotalSeconds);
+            },
+            onUnexpected: ex => log.LogError(ex, "Yukleme adiminda beklenmeyen hata; yeniden denenecek."));
+
+        if (await runner.RunAsync(ct) == UploadOutcome.AuthFailed)
+            log.LogError("Sunucu kimlik bilgisini reddetti (401/403). Yukleme durduruldu; ornekler spool da korunuyor.");
     }
 }

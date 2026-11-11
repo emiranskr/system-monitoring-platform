@@ -93,12 +93,29 @@ public sealed class Uploader
             }
             if (status != 200) return UploadOutcome.Retry; // 429, 5xx ve beklenmeyen kodlar
 
-            using var doc = JsonDocument.Parse(text);
-            var root = doc.RootElement;
-            if (!root.TryGetProperty("ack_seq", out var ackEl) || ackEl.GetInt64() < batch.Seq)
-                return UploadOutcome.Retry; // onaylanmadi: batch silinmez
+            // Sunucu yaniti guvenilmez girdi sayilir (proxy HTML sayfasi, eksik alan, yanlis tip): hicbiri istisna
+            // firlatmaz; dogrulanamayan yanit onay degildir -> batch korunur, yeniden denenir.
+            long ack;
+            long rejected = 0;
+            try
+            {
+                using var doc = JsonDocument.Parse(text);
+                var root = doc.RootElement;
+                if (root.ValueKind != JsonValueKind.Object
+                    || !root.TryGetProperty("ack_seq", out var ackEl)
+                    || ackEl.ValueKind != JsonValueKind.Number
+                    || !ackEl.TryGetInt64(out ack))
+                    return UploadOutcome.Retry;
+                if (root.TryGetProperty("rejected", out var rej) && rej.ValueKind == JsonValueKind.Number && rej.TryGetInt64(out var rj))
+                    rejected = rj;
+            }
+            catch (JsonException)
+            {
+                return UploadOutcome.Retry;
+            }
+            if (ack < batch.Seq) return UploadOutcome.Retry; // onaylanmadi: batch silinmez
 
-            if (root.TryGetProperty("rejected", out var rej)) RejectedSamples += rej.GetInt64();
+            RejectedSamples += rejected;
             if (TryGetServerTime(text, out var serverTime)) _spool.SetClockOffset(serverTime - _now());
             _spool.Ack(batch);
             return UploadOutcome.Acked;
