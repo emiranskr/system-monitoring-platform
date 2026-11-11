@@ -1,4 +1,5 @@
 using SysMon.Agent;
+using SysMon.Agent.Transport;
 
 AgentOptions options;
 try
@@ -9,6 +10,28 @@ catch (ArgumentException ex)
 {
     Console.Error.WriteLine(ex.Message);
     return 2;
+}
+
+// Bootstrap: duz metin token dosyasini korumali depoya tasi, duz metin dosyayi sil ve cik.
+if (options.ImportToken is not null)
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        Console.Error.WriteLine("--import-token yalnizca Windows'ta desteklenir.");
+        return 2;
+    }
+    try
+    {
+        var store = new TokenStore(AgentPaths.TokenStorePath(options));
+        TokenImporter.Import(options.ImportToken, store);
+        Console.WriteLine($"Token korumali depoya yazildi: {store.Path}");
+        return 0;
+    }
+    catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException or UnauthorizedAccessException)
+    {
+        Console.Error.WriteLine($"Token iceri aktarilamadi: {ex.Message}");
+        return 1;
+    }
 }
 
 using var host = AgentHost.Build(options, []);

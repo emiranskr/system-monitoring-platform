@@ -19,9 +19,7 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
             return;
         }
 
-        var dataDir = options.DataDir
-                      ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SysMon", "agent");
-        var spool = new Spool(Path.Combine(dataDir, "spool"),
+        var spool = new Spool(AgentPaths.SpoolDir(options),
             new SpoolLimits(MaxBytes: 50L * 1024 * 1024, MaxAge: TimeSpan.FromHours(24), SegmentBytes: 1024 * 1024),
             () => DateTimeOffset.UtcNow);
 
@@ -39,14 +37,16 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
 
         if (options.Server is not null)
         {
-            if (options.TokenFile is null || !File.Exists(options.TokenFile))
+            var store = new TokenStore(AgentPaths.TokenStorePath(options));
+            if (!store.TryLoad(out _))
             {
-                log.LogError("--server verildi ama --token-file bulunamadi; yukleme kapali, ornekler spool'a yaziliyor.");
+                log.LogError("Korumali token deposu yok veya okunamadi ({Path}); --import-token ile token iceri aktarin. Yukleme kapali, ornekler spool a yaziliyor.", store.Path);
             }
             else
             {
-                var uploader = new Uploader(spool, new HttpClient { Timeout = TimeSpan.FromSeconds(30) },
-                    new Uri(options.Server), () => File.ReadAllText(options.TokenFile).Trim(), options, () => DateTimeOffset.UtcNow);
+                var uploader = new Uploader(spool, HttpClients.Create(options.ServerPins), new Uri(options.Server),
+                    () => store.TryLoad(out var t) ? t! : throw new InvalidOperationException("Token okunamadi."),
+                    options, () => DateTimeOffset.UtcNow);
                 tasks.Add(UploadLoop(uploader, stoppingToken));
             }
         }
@@ -79,6 +79,10 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log) 
                         var wait = Backoff.Next(attempt++, rnd);
                         log.LogWarning("Yukleme basarisiz, {Wait:0.0} sn sonra yeniden denenecek.", wait.TotalSeconds);
                         await Task.Delay(wait, ct);
+                        break;
+                    case UploadOutcome.TlsRejected:
+                        log.LogError("Sunucu sertifikasi dogrulanamadi (SPKI pin / sertifika). 5 dk sonra yeniden denenecek; veri ve token gonderilmedi.");
+                        await Task.Delay(Backoff.Cap, ct);
                         break;
                     case UploadOutcome.AuthFailed:
                         log.LogError("Sunucu kimlik bilgisini reddetti (401/403). Yukleme durduruldu; ornekler spool'da korunuyor.");

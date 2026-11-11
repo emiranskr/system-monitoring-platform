@@ -6,13 +6,16 @@ public sealed record AgentOptions(
     bool AllowInsecureLoopback,
     string? Server = null,
     string? TokenFile = null,
-    string? DataDir = null)
+    string? DataDir = null,
+    string? ImportToken = null,
+    IReadOnlyList<string>? ServerPins = null)
 {
     public static AgentOptions Parse(string[] args)
     {
         var service = false;
         var insecure = false;
-        string? server = null, tokenFile = null, dataDir = null;
+        string? server = null, tokenFile = null, dataDir = null, importToken = null;
+        var pins = new List<string>();
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -29,6 +32,12 @@ public sealed record AgentOptions(
                 case "--data-dir":
                     dataDir = Value(args, ref i);
                     break;
+                case "--import-token":
+                    importToken = Value(args, ref i);
+                    break;
+                case "--server-pin":
+                    pins.Add(Value(args, ref i));
+                    break;
                 case "--allow-insecure-loopback":
 #if DEBUG
                     insecure = true;
@@ -41,7 +50,7 @@ public sealed record AgentOptions(
                     throw new ArgumentException($"Bilinmeyen secenek: {args[i]}");
             }
         }
-        return new AgentOptions(service, insecure, server, tokenFile, dataDir);
+        return new AgentOptions(service, insecure, server, tokenFile, dataDir, importToken, pins.Count == 0 ? null : pins);
     }
 
     private static string Value(string[] args, ref int i)

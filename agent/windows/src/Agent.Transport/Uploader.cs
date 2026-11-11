@@ -13,6 +13,8 @@ public enum UploadOutcome
     Acked,
     /// <summary>Gecici hata: ayni batch yeniden denenecek, spool korunur.</summary>
     Retry,
+    /// <summary>TLS dogrulamasi (SPKI pin / sertifika) basarisiz: hicbir veri veya token gonderilmedi; spool korunur.</summary>
+    TlsRejected,
     /// <summary>401/403: agent durmali, spool korunur, durum yuzeye cikarilmali.</summary>
     AuthFailed,
 }
@@ -68,6 +70,10 @@ public sealed class Uploader
         try
         {
             resp = await _http.SendAsync(req, ct);
+        }
+        catch (HttpRequestException ex) when (ex.InnerException is System.Security.Authentication.AuthenticationException)
+        {
+            return UploadOutcome.TlsRejected;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
