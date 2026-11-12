@@ -21,6 +21,8 @@ export interface AppOptions {
   sampleIntervalSeconds?: number;
   /** Hiz sinirlari (varsayilanlar ratelimit.ts'te). */
   limits?: Limits;
+  /** Verilirse sunucu HTTPS dinler (TLS >= 1.2). Agent (Release) yalnizca HTTPS kabul eder. */
+  https?: { key: string | Buffer; cert: string | Buffer };
 }
 
 export function buildApp(opts: AppOptions): FastifyInstance {
@@ -31,6 +33,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   }
   const now = opts.now ?? (() => new Date());
   const app = Fastify({
+    ...(opts.https ? { https: { key: opts.https.key, cert: opts.https.cert, minVersion: "TLSv1.2" as const } } : {}),
     logger: opts.logger
       ? { redact: ["req.headers.authorization", "req.headers.cookie"], level: typeof opts.logger === "object" ? opts.logger.level : "info" }
       : false,
