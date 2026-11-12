@@ -45,13 +45,23 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
             new NetworkCollector(new SystemNetworkSource(), () => Environment.TickCount64),
         ], TimeSpan.FromSeconds(2));
 
-        var pipeline = new SamplingPipeline(runner, spool, () => DateTimeOffset.UtcNow, SampleInterval, BatchInterval,
+        SamplingPipeline? pipeline = null;
+        Uploader? uploader = null;
+        var loss = new LossReporter(
+            () => new LossCounters(pipeline?.DroppedSamples ?? 0, uploader?.RejectedSamples ?? 0, spool.DroppedBatches),
+            msg => log.LogWarning("{Message}", msg),
+            (ex, suppressed) => log.LogError(ex,
+                "Ornekler spool'a yazilamadi (tamponda tutuluyor, yeniden denenecek); son aralikta {Suppressed} benzer hata bastirildi.", suppressed),
+            () => DateTimeOffset.UtcNow, TimeSpan.FromSeconds(60));
+
+        pipeline = new SamplingPipeline(runner, spool, () => DateTimeOffset.UtcNow, SampleInterval, BatchInterval,
             onStatusChange: st =>
             {
                 if (st.Ok) log.LogInformation("Collector {Name} duzeldi.", st.Name);
                 else log.LogWarning("Collector {Name} calismiyor: {Message}", st.Name, st.Message);
-            });
-        var tasks = new List<Task> { pipeline.RunAsync(stoppingToken) };
+            },
+            onError: loss.ReportError);
+        var tasks = new List<Task> { pipeline.RunAsync(stoppingToken), LossLoop(loss, stoppingToken) };
 
         if (options.Server is not null)
         {
@@ -59,12 +69,12 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
             // Token gecidi kaldirildi: baslangicta token olmasa bile yukleme dongusu baslatilir;
             // token daha sonra aktarildiginda veya degistiginde (401/403 5 dk aralikla denenirken)
             // servis yeniden baslatilmadan toparlanir.
-            var uploader = new Uploader(spool, HttpClients.Create(options.ServerPins), new Uri(options.Server),
+            uploader = new Uploader(spool, HttpClients.Create(options.ServerPins), new Uri(options.Server),
                 () => ReadToken(store),
                 options, () => DateTimeOffset.UtcNow);
 
             uploader.BatchDropped += (batch, status) =>
-                log.LogWarning("Zehirli batch atildi: seq {Seq}, durum {Status}. Spool kuyrugu temizlendi.", batch.Seq, status);
+                log.LogWarning("Zehirli batch atildi: seq {Seq}, durum {Status}. Yalnizca bu batch kuyruktan cikarildi.", batch.Seq, status);
 
             log.LogInformation("Yukleme etkin: sunucu {Server}, SPKI pin sayisi {Pins}.",
                 options.Server, options.ServerPins?.Count ?? 0);
@@ -76,6 +86,18 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
         }
 
         await Task.WhenAll(tasks);
+    }
+
+    /// <summary>Kayip sayaclarini periyodik kontrol eder; degisim varsa kumulatif degerlerle bir uyari yazar.</summary>
+    private static async Task LossLoop(LossReporter loss, CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(60));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct)) loss.CheckCounters();
+        }
+        catch (OperationCanceledException) { /* normal kapanis */ }
+        loss.CheckCounters();
     }
 
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]

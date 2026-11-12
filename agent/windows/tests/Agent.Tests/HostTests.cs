@@ -39,6 +39,36 @@ public sealed class HostTests : IDisposable
     }
 
     [Fact]
+    public async Task I3_Spool_yazma_hatasi_uretim_kablolamasinda_gunluge_yazilir()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var host = AgentHost.Build(new AgentOptions(false, false, DataDir: _dataDir), []);
+        await host.StartAsync();
+        var spoolDir = Path.Combine(_dataDir, "spool");
+        await TestUtil.WaitUntil(() => Directory.Exists(spoolDir) && Directory.GetFiles(spoolDir, "seg-*.jsonl").Length > 0, 30_000,
+            "ilk batch yazilmadi");
+
+        string text;
+        using (new FileStream(Directory.GetFiles(spoolDir, "seg-*.jsonl")[0], FileMode.Open, FileAccess.Read, FileShare.None)) // yazmayi engelle
+        {
+            var logPath = Path.Combine(_dataDir, "logs", "agent.log");
+            await TestUtil.WaitUntil(() => File.Exists(logPath) && ReadShared(logPath).Contains("spool'a yazilamadi"), 30_000,
+                "Enqueue hatasi gunluge yazilmadi");
+            text = ReadShared(logPath);
+        }
+        await host.StopAsync();
+
+        Assert.Contains("spool'a yazilamadi", text);
+    }
+
+    private static string ReadShared(string path)
+    {
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var sr = new StreamReader(fs);
+        return sr.ReadToEnd();
+    }
+
+    [Fact]
     public async Task Host_baska_ornek_calisiyorsa_InstanceLock_nedeniyle_guvenle_durur()
     {
         if (!OperatingSystem.IsWindows()) return;
