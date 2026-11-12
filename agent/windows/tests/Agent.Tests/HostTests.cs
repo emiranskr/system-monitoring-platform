@@ -48,8 +48,17 @@ public sealed class HostTests : IDisposable
         await TestUtil.WaitUntil(() => Directory.Exists(spoolDir) && Directory.GetFiles(spoolDir, "seg-*.jsonl").Length > 0, 30_000,
             "ilk batch yazilmadi");
 
+        // Dosya yazici tarafindan o an acik olabilir (olustur+yaz+fsync penceresi): kilidi, alinana kadar yeniden dene (N-5).
+        var segPath = Directory.GetFiles(spoolDir, "seg-*.jsonl")[0];
+        FileStream? held = null;
+        await TestUtil.WaitUntil(() =>
+        {
+            try { held = new FileStream(segPath, FileMode.Open, FileAccess.Read, FileShare.None); return true; } // yazmayi engelle
+            catch (IOException) { return false; }
+        }, 30_000, "segment kilidi alinamadi");
+
         string text;
-        using (new FileStream(Directory.GetFiles(spoolDir, "seg-*.jsonl")[0], FileMode.Open, FileAccess.Read, FileShare.None)) // yazmayi engelle
+        using (held)
         {
             var logPath = Path.Combine(_dataDir, "logs", "agent.log");
             await TestUtil.WaitUntil(() => File.Exists(logPath) && ReadShared(logPath).Contains("spool'a yazilamadi"), 30_000,

@@ -1,79 +1,56 @@
-# M1 Durum Raporu — 2026-11-11
+# M1 Durum Raporu — 2026-11-12
 
-**Dal:** `feat/m1-review-batch-b` (taban: `feat/m1-agent` commit `51aecdf`)  
-**Kod commit'i:** `cf70091` (doğrulama HEAD'i `d88d40d`)  
-**Durum:** **M1 KAPANMADI.** Kod ve testler yeşil, A5 ve 10 dk soak son kodla doğrulandı. Bağımsız incelemenin son kod üzerindeki nihai raporu repoda yok; açık Critical/Important bulgu olmadığı henüz kanıtlanmadı. Merge ve kapanış kullanıcı onayı bekliyor.
+**Dal:** `fix/m1-important-bulgulari` (taban: `feat/m1-review-batch-b` @ `0de529b`)
+**Durum:** **M1 KAPANMADI.** Kod, testler, A5, soak ve dar kapsamlı bağımsız inceleme tamam (Critical 0, Important 0). Birleştirme ve M1 kapanışı kullanıcının açık onayını bekliyor. M2'ye geçilmedi.
 
----
+## 1. Kanıtlar (hepsi gerçek koşu)
 
-## 1. Test Sonuçları (Gerçek ve Doğrulanmış)
+| Doğrulama | Sonuç | Not / kanıt |
+|---|---|---|
+| Debug testleri | **166/166** | Son kod |
+| Release testleri | **151/151** | Son kod (Debug 166 / Release 151 farkı: `UploaderTests` yalnızca Debug) |
+| A5 `Verify-ServiceInstall.ps1` (Windows, yönetici) | **BASARILI, 28 GECTI / 0 KALDI** | `kanit/a5-fix-sonrasi.log`. Servis sanal hesapla çalışıyor, PDH grup gerekliliği, ACL, token (negatif+olumlu kontrol), kurtarma, bilerek başarısız kurulumun geri alınması, yeniden kurulum, failure flag, temizlik, grup sızıntısı yok (8→8) |
+| 10 dk gerçek zamanlı kesinti soak'ı (HEAD `0db33a8`) | **Geçti** (12 dk 36 sn) | 600 sn kesinti, kesintide 104 batch birikti, 661 örnek, 115 batch = 115 ham istek, **tekrar 0**, boşalma 96 sn, 10 retry, en uzun bekleme 264 sn. Test her örneği benzersiz sayaçla sayar: kayıp/çift kayıt/seq boşluğu yok. Log: `kanit/soak-10dk-fix-sonrasi.log` |
+| Dar kapsamlı bağımsız inceleme (`0de529b..0db33a8`) | **Critical 0, Important 0**, Minor 6, Informational 2 | `M1-dar-inceleme-3.md`. Kod okunarak; reviewer test koşturmadı |
 
-| Konfigürasyon | Toplam Test | Başarılı | Başarısız | Atlanan | Süre | Not |
-|---|---|---|---|---|---|---|
-| **Debug** | **145** | **145** | **0** | **0** | ~10 sn | Tüm birim, entegrasyon ve loopback HTTP testleri dahil |
-| **Release** | **130** | **130** | **0** | **0** | ~10 sn | Düz HTTP yasak; gerçek TLS Kestrel uçtan uca testleri dahil |
-| **Outage Soak (Release, 10 dk kesinti)** | **1** | **1** | **0** | **0** | 13 dk 52 sn | HEAD `d88d40d`, `SYSMON_SOAK_REAL_TIMING=1`, baseline 60 sn, kesinti 600 sn. `SOAK_RAPOR`: kesintide biriken 105 batch, 661 örnek, 115 batch = 115 ham istek, **tekrar=0**, boşalma 170 sn, 11 retry, max bekleme 200,9 sn. Test örnek değerlerini benzersiz sayaçla kontrol ettiğinden kayıp/çift kayıt/seq boşluğu yok. Log: `docs/ilerleme/kanit/soak-10dk-son-kod.log` |
-| **A5 Verify-ServiceInstall (Windows, yönetici)** | - | **BASARILI** | 0 | - | ~100 sn | HEAD `d88d40d`, Release yayını. Sanal hesap, PDH grup gerekliliği, ACL, token, kurtarma, temizlik: tüm kontroller GECTI. Log: `docs/ilerleme/kanit/a5-son-kod.log`. Temizlik ayrıca elle doğrulandı (servis/dizin/grup üyeliği/geçici dosya kalmadı) |
-| **Publish (Release)** | - | **Başarılı** | **0** | - | 3 sn | `Agent.Service` derleme ve paketleme hatasız |
+Önceki (eski) kanıt dosyaları değiştirilmedi: `kanit/a5-son-kod.log`, `kanit/soak-10dk-son-kod.log`.
 
-*Not:* Başlangıçta `feat/m1-agent` üzerinde 115 Debug / 100 Release testi mevcuttu. Bu çalışma kapsamında 30 yeni test eklenerek kapsam 145 Debug / 130 Release seviyesine çıkarılmıştır.
+## 2. Bağımsız inceleme 2 bulgularının durumu (`M1-bagimsiz-inceleme-2.md`)
 
----
+| Bulgu | Durum | Düzeltme (commit) | Kapsayan test |
+|---|---|---|---|
+| I-1 çıkış kodu | **Düzeldi** | `d3635d5` (`Program.cs` `return Environment.ExitCode`) | `ProcessExitCodeTests` (gerçek süreç; kod 0 iken kırmızıydı) |
+| I-2 Spool yarım yazma | **Düzeldi** | `44f98ea` (`AppendDurably`: kalıntı kırpılır; `PeekOldest` düşen ref'i sayar/bildirir) | `SpoolPartialWriteTests` (kalıntı sonrası kayıp, restart recovery, kaybolan segment sayımı) |
+| I-3 kayıp görünürlüğü | **Düzeldi** | `c4c4f9e` (`LossReporter`, `onError` kablolaması, periyodik sayaç logu) | `LossReporterTests`, `HostTests.I3_...` (kablolama kaldırılınca kırmızı) |
+| I-4 token / vacuous A5 | **Düzeldi** | `4687752` (`TokenProvider`, boş token istek göndermez, A5 negatif+olumlu kontrol) | `TokenProviderTests`, `UploaderEmptyTokenTests`, A5 |
+| Installer M-4 (LocalSystem penceresi) | **Düzeldi (taze kurulum)** | `49ec7c9`, `0db33a8` (Disabled oluştur → yapılandır → doğrula → en son otomatik; hata halinde geri al; failureflag; https-only `-Server`; `-ServiceName` regex) | A5 aşama 4 |
+| Boş testler (O7 yönlendirme, `ack<seq` Release, kesik gzip, MIN-03) | **Düzeldi** | `919c3ce` | Mutasyonla doğrulandı (aşağıda) |
 
-## 2. Tamamlanan ve Kanıtlanan Gözden Geçirme Maddeleri (Review Batch-B)
+**A5 sırasında bulunan ek gerçek hata:** `net localgroup` uzun servis adlarında söz dizimi hatası veriyor (varsayılan `SysMonAgent` etkilenmiyordu). `Add/Remove-LocalGroupMember` (SID ile) ile değiştirildi; üyelik, servis silinmeden önce kaldırılıyor (yetim SID yok). Kanıt: `kanit/a5-fix-sonrasi-hata-net-sozdizimi.log`, `kanit/diag-net-localgroup-uzun-ad.log`.
 
-1. **InstanceLock (Tek Örnek Kilidi):**
-   - Veri dizini başına `agent.lock` dosyası `FileShare.None` ile açılarak konsol ve servis modlarının çakışması ve spool'u bozması engellendi. Süreç sonlandığında OS kilidi bırakır.
-   - `HostTests` ile kilit alındığında ikinci bir instance'ın çalışmadığı ve `lifetime.StopApplication()` ile temizce sonlandığı kanıtlandı.
-2. **Uploader Güvenlik ve Hata Yönetimi (Ö7):**
-   - `SocketsHttpHandler.AllowAutoRedirect = false` (HTTP redirect takibi engellendi, 3xx yanıtlarında ikinci hosta veri/istek gitmez).
-   - `HttpClient.MaxResponseContentBufferSize = 1_048_576` (1 MB yanıt sınırı; 5 MB gibi aşırı büyük sunucu yanıtları tampon aşımı ile `Retry` döner, bellek taşmaz, spool onaylanmaz).
-   - `PooledConnectionLifetime = 15 dk` (bağlantı ömrü sınırlanarak DNS güncellemelerine uyum sağlandı).
-3. **Kültürden Bağımsız ISO-8601 Tarih Biçimi (Ö11):**
-   - `Uploader.BuildContent`: `sent_at` ve örnek `ts` alanları `CultureInfo.InvariantCulture` ile formatlanır. `ar-SA` (Hicri), `th-TH` (Budist) ve `fa-IR` yerel ayarlarında Gregoryen ASCII ISO `yyyy-MM-ddTHH:mm:ssZ` formatı üretildiği test edildi.
-4. **Server Time Offset Sınırı ve Güvenli Ayrıştırma (K2):**
-   - `Uploader.TryGetServerTime` ve `TryApplyServerTime`:
-     - JSON kök öğesinin nesne (`JsonValueKind.Object`) olduğu ve `server_time` alanının `String` olduğu doğrulandı (dizi, sayı, boolean tiplerinde istisna fırlatmaz).
-     - Zaman damgası `CultureInfo.InvariantCulture`, `AssumeUniversal | AdjustToUniversal` ile UTC olarak çözülür.
-     - Saat dilimi eki olmayan zaman damgaları yerel saat kayması eklenmeden UTC sayılır.
-     - Ofset sınırı `MaxClockOffset = ±366 gün` olarak uygulandı. 9999 yılı gibi aşırı sunucu saatleri kuyruğu bozmaz ve yok sayılır. 200 OK ve 409 Conflict durumlarında geçerlidir.
-5. **Zehirli Batch Yönetimi (Ö8):**
-   - Aynı batch için ardışık 10 kalıcı 4xx (400, 404, 413, 422 vb.; 408, 429 ve 409 saat sapması hariç) yanıtı alındığında batch kuyruktan atılır (`_spool.Ack`).
-   - `BatchDropped` olayı tetiklenir, `UploadOutcome.Acked` ile sonraki batch'e geçilir.
-   - Geçici hatalar (5xx, 429, 408) batch'i asla atmaz.
-   - Başarılı yükleme (200 OK) veya yeni batch gelmesi kalıcı hata sayacını sıfırlar.
-6. **UploadRunner 401/403 Davranışı (AuthFailed):**
-   - `UploadRunner.RunAsync` artık servisi kalıcı sonlandırmaz (`Task` döner).
-   - `AuthFailed` durumunda `Backoff.Cap` (5 dk) beklenerek yeniden denenir. Cihaz token'ı sonradan aktarıldığında servis yeniden başlatılmadan yükleme hattı toparlanır.
-7. **Komut Satırı Doğrulamaları (`AgentOptions`):**
-   - `--server`: Mutlak URL, `http` (yalnızca debug loopback bayrağıyla) veya `https` şeması, `UserInfo` içermeme kontrolü.
-   - `--server-pin`: `sha256/` öneki ve geçerli 32 bayt Base64 kontrolü.
-8. **Worker ve Program Entegrasyonu:**
-   - `AgentWorker.ExecuteAsync`: `await Task.Yield()`, `InstanceLock.TryAcquire`, token başlangıç kapısı kaldırıldı (boot anında token olmasa bile yükleyici başlar), `BatchDropped` ve Spool `onDropped` loglama.
-   - `Program.cs`: Token import esnasında `CryptographicException` yakalanarak dostane hata mesajı ve çıkış kodu 1 sağlandı.
-9. **PDH Collect Dayanıklılığı:**
-   - `PdhCpuSource`: `PdhCollectQueryData` çağrısı başarısız olduğunda query handle'ı kapatılıp `Error` atanır; 60 sn sonra `TryInit` ile otomatik yeniden başlatılır.
-10. **Servis Kurulum Betiği (`Install-SysMonService.ps1`):**
-    - `sc.exe config obj=`, `sc.exe sidtype`, `sc.exe config start=` ve `sc.exe failure` komutlarının `$LASTEXITCODE` çıkış kodları denetlenir.
-    - Yol parametrelerindeki boşluklar ve sondaki ters/düz bölüler temizlenir (`$DataDir.Trim().TrimEnd('\', '/')`).
-    - `$Server` ve `$ServerPin` girdi doğrulamaları PowerShell düzeyinde de yapıldı.
+**Mutasyon sonuçları (gözlenen):** `AllowAutoRedirect=true` → yönlendirme testi KIRMIZI; `ack < seq` kontrolü silinince → yeni Release testi KIRMIZI; `InvalidDataException` yakalaması değişince → bozuk-içerikli gzip testi KIRMIZI. Kesik gzip varyantı bilerek yeşil kalır (.NET kesik gzip'te hata vermez); bu yüzden bozuk-içerik testi eklendi. Kablolama kaldırılınca `I3_...` testi KIRMIZI. `Program.cs` `return 0` iken `ProcessExitCodeTests` KIRMIZI.
 
----
+## 3. Açık takip işleri (bilinçli ertelendi; hiçbiri Critical/Important değil)
 
-## 3. Bağımsız Kod İncelemesi (Senior Code Review) Bulguları ve Giderilmesi
+Ayrıntı: `M1-dar-inceleme-3.md`.
+- **N-1** Başarısız *yükseltmede* servis Disabled kalır ve zaten var olan grup üyeliği geri alma sırasında silinebilir; eski `ImagePath`/`StartMode` geri yüklenmez. Yeniden kurulum onarır.
+- **N-2** Spool aktif segment dosyası dışarıdan (antivirüs/yönetici) silinir ya da kısalırsa `AppendDurably` dosyayı NUL ile uzatır; o batch geçersiz satıra düşer (sayılır, ama kaybolur). Düşük olasılık. **Spool veri yolu değiştiği için düzeltme 10 dk soak'ın yeniden koşulmasını gerektirir; bu yüzden şimdi yapılmadı.**
+- **N-3** `PeekOldest` kaynaklı düşme için `onDropped` günlük metni "boyut veya yaş sınırı" diyor (yanlış neden).
+- **N-4** A5'teki "üyelik geri alındı" kontrolü fiilen boş geçiyor (bilerek yaratılan hata üyelik eklenmeden önce çıkıyor).
+- **N-6** `-Server`/dizinler `ImagePath`'e kaçışsız ekleniyor (yönetici girdisi; sertleştirme).
+- **N-7** `failureflag`'in .NET Windows-service ana bilgisayarında `Environment.ExitCode` ile uçtan uca çalıştığı SCM'de kanıtlanmadı.
+- **N-8** Çalışan serviste sonradan aktarılan token en geç ~5 dk sonra kullanılır (`AuthFailed` bekleme tavanı).
+- Önceki rapordaki M-1…M-3, M-5…M-11 (Minor) açık.
+- **Düzeltildi:** N-5 (aralıklı kırılabilen `HostTests` kilit alma penceresi) test kodunda yeniden denemeyle giderildi.
 
-> **Doğrulama notu:** Aşağıdaki IMP/MIN bulguları commit `cf70091`'den alınmıştır. İncelemenin nihai raporu repoda bulunamadı; "açık Critical/Important kalmadı" iddiası son kod üzerinde yeniden yapılacak bağımsız incelemeyle doğrulanmalıdır (BEKLİYOR).
+## 4. Sınırlar (dürüstlük notu)
+- Gerçek ENOSPC / ani güç kesintisi otomatik test edilmedi; yarım satır kalıntısı simülasyonu ve restart recovery testleri aynı hata sınıfını kapsıyor.
+- SCM'de `failureflag` fiili yeniden başlatma davranışı kanıtlanmadı (N-7).
+- Bellek hedefi (private working set < 50 MB) ADR 0003'te eski kodda ölçüldü, bu HEAD'de yeniden ölçülmedi.
+- Daha önce bir testin aralıklı kırıldığı bir koşu görüldü (`Expected: True / Actual: False`); sonraki 5 koşuda tekrarlanmadı, hangi test olduğu yakalanamadı. MIN-03 (bellek testinin paralel koşması) düzeltildi ve olası neden budur, ama kanıtlanmadı.
+- Soak testi `HEAD 0db33a8`'de koşuldu; sonraki tek kod değişikliği test dosyası (`HostTests`) ve belgelerdir.
 
-Aşağıdaki bulgular TDD ile giderildi:
-- **IMP-01 (Düzeltildi):** 409 Conflict yanıtı dizi (`["conflict"]`) veya string (`"conflict"`) döndüğünde `JsonDocument.TryGetProperty` çağrısının `InvalidOperationException` fırlatması engellendi (`doc.RootElement.ValueKind != JsonValueKind.Object` kontrolü eklendi).
-- **IMP-02 (Düzeltildi):** `InstanceLock` alınamadığında `AgentWorker`'ın arka planda asılı kalması engellendi; `IHostApplicationLifetime` enjekte edilerek `lifetime.StopApplication()` ve `Environment.ExitCode = 1` çağrıldı.
-- **MIN-01 (Düzeltildi):** Kurulum betiği parametre temizliği `$Path.Trim().TrimEnd('\', '/')` olarak genişletildi.
-- **MIN-02 (Düzeltildi):** `UploadOutcome.AuthFailed` XML doc comment güncellendi.
-- **MIN-03 (Düzeltildi):** `SpoolReviewTests` sınıfına `[Collection("NonParallelSpoolMemory")]` eklenerek paralel test koşumlarındaki bellek ölçüm kırılganlığı giderildi.
-
----
-
-## 4. Sonraki Adım: M1 Kapanışı ve M2 Hazırlığı
-
-- Kalan: son kod üzerinde bağımsız inceleme (Critical/Important = 0 kanıtı), sonra kullanıcıdan merge ve M1 kapanış onayı.
-- M2'ye ve merge'e kullanıcı onayı olmadan geçilmez.
+## 5. M1'i kapatmak için kalan işler
+1. Kullanıcı açık onayı: `fix/m1-important-bulgulari` → `feat/m1-review-batch-b` → `feat/m1-agent` birleştirme sırası ve M1 kapanışı. (Onaysız yapılmaz.)
+2. İsteğe bağlı: N-1/N-2/N-4 düzeltmesi (N-2 sonrası soak tekrarı gerekir) veya M2 sertleştirme görevine alınması.
+3. Ardından M2 (Backend) ve M3 (Web Dashboard).
