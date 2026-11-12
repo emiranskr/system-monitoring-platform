@@ -8,7 +8,8 @@ namespace SysMon.Agent;
 /// <summary>Collector -> spool hatti ve (sunucu verilmisse) spool -> sunucu yukleme dongusu.</summary>
 public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, IHostApplicationLifetime lifetime) : BackgroundService
 {
-    private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(1);
+    // Baslangic ornekleme araligi (tasarim varsayimi: 5 sn); sunucu ingest yanitindaki config.interval_seconds ile degistirebilir.
+    private static readonly TimeSpan DefaultSampleInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan BatchInterval = TimeSpan.FromSeconds(5);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -54,13 +55,14 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
                 "Ornekler spool'a yazilamadi (tamponda tutuluyor, yeniden denenecek); son aralikta {Suppressed} benzer hata bastirildi.", suppressed),
             () => DateTimeOffset.UtcNow, TimeSpan.FromSeconds(60));
 
-        pipeline = new SamplingPipeline(runner, spool, () => DateTimeOffset.UtcNow, SampleInterval, BatchInterval,
+        var sampling = new SamplingConfig(DefaultSampleInterval);
+        pipeline = new SamplingPipeline(runner, spool, () => DateTimeOffset.UtcNow, DefaultSampleInterval, BatchInterval,
             onStatusChange: st =>
             {
                 if (st.Ok) log.LogInformation("Collector {Name} duzeldi.", st.Name);
                 else log.LogWarning("Collector {Name} calismiyor: {Message}", st.Name, st.Message);
             },
-            onError: loss.ReportError);
+            onError: loss.ReportError, sampling: sampling);
         var tasks = new List<Task> { pipeline.RunAsync(stoppingToken), LossLoop(loss, stoppingToken) };
 
         if (options.Server is not null)
@@ -72,7 +74,7 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
                 m => log.LogInformation("{Message}", m), m => log.LogWarning("{Message}", m));
             uploader = new Uploader(spool, HttpClients.Create(options.ServerPins), new Uri(options.Server),
                 tokens.Get,
-                options, () => DateTimeOffset.UtcNow);
+                options, () => DateTimeOffset.UtcNow, sampling);
 
             uploader.BatchDropped += (batch, status) =>
                 log.LogWarning("Zehirli batch atildi: seq {Seq}, durum {Status}. Yalnizca bu batch kuyruktan cikarildi.", batch.Seq, status);

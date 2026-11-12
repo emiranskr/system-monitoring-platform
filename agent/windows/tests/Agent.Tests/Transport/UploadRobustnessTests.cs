@@ -69,6 +69,49 @@ public sealed class UploadRobustnessTests : IAsyncDisposable
         Assert.Empty(other.AuthHeaders);   // ve token da gitmedi
     }
 
+    private async Task<(UploadOutcome Outcome, SamplingConfig Config)> UploadWithConfig(string response)
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        spool.Enqueue(One(1)); // seq 0
+        _srv.Respond = _ => (200, response);
+        var config = new SamplingConfig(TimeSpan.FromSeconds(5));
+        var up = new Uploader(spool, HttpClients.Create([SpkiPin.Compute(_srv.Cert)]), _srv.Url, () => "t", AgentOptions.Parse([]), () => _now, config);
+        return (await up.UploadOnceAsync(default), config);
+    }
+
+    [Fact]
+    public async Task Sunucu_config_interval_seconds_gonderirse_ornekleme_araligi_guncellenir()
+    {
+        var (outcome, config) = await UploadWithConfig("{\"ack_seq\":0,\"rejected\":0,\"config\":{\"interval_seconds\":15}}");
+        Assert.Equal(UploadOutcome.Acked, outcome);
+        Assert.Equal(TimeSpan.FromSeconds(15), config.Interval);
+    }
+
+    [Theory]
+    [InlineData("{\"ack_seq\":0,\"config\":{\"interval_seconds\":0}}")]
+    [InlineData("{\"ack_seq\":0,\"config\":{\"interval_seconds\":999999}}")]
+    [InlineData("{\"ack_seq\":0,\"config\":{\"interval_seconds\":\"x\"}}")]
+    [InlineData("{\"ack_seq\":0,\"config\":[1]}")]
+    [InlineData("{\"ack_seq\":0,\"config\":null}")]
+    [InlineData("{\"ack_seq\":0}")]
+    public async Task Gecersiz_veya_eksik_config_araligi_degistirmez_ve_onay_yine_gecerlidir(string response)
+    {
+        var (outcome, config) = await UploadWithConfig(response);
+        Assert.Equal(UploadOutcome.Acked, outcome);
+        Assert.Equal(TimeSpan.FromSeconds(5), config.Interval);
+    }
+
+    [Theory]
+    [InlineData("{\"ack_seq\":\"yedi\",\"config\":{\"interval_seconds\":15}}")]   // ack sayi degil
+    [InlineData("{\"ack_seq\":-1,\"config\":{\"interval_seconds\":15}}")]        // ack < gonderilen seq (0): onay degil
+    public async Task Gecersiz_onay_icindeki_config_UYGULANMAZ(string response)
+    {
+        var (outcome, config) = await UploadWithConfig(response);
+        Assert.Equal(UploadOutcome.Retry, outcome);
+        Assert.Equal(TimeSpan.FromSeconds(5), config.Interval);
+    }
+
     [Fact]
     public async Task Ack_seq_gonderilen_seqten_kucukse_batch_silinmez_Release_dahil()
     {

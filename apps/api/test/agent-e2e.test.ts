@@ -26,7 +26,8 @@ describe.skipIf(!enabled)("agent <-> API uca-uca (gercek surec)", () => {
   let org = "", device = "", port = 0;
 
   const startApi = async () => {
-    app = buildApp({ pool: db.pool, credentialKey: Buffer.alloc(32, 1) });
+    // Sunucu agent'tan 1 sn ornekleme ister (varsayilan 5 sn): agent'in config.interval_seconds'e GERCEKTEN uydugunu da kanitlar.
+    app = buildApp({ pool: db.pool, credentialKey: Buffer.alloc(32, 1), sampleIntervalSeconds: 1 });
     app.addHook("onResponse", async (req, reply) => {
       statuses.push(reply.statusCode);
       seenAuth.add(String(req.headers.authorization ?? "").slice(0, 7));
@@ -56,7 +57,7 @@ describe.skipIf(!enabled)("agent <-> API uca-uca (gercek surec)", () => {
     if (imp.status !== 0) throw new Error(`token import basarisiz: ${imp.stdout}${imp.stderr}`);
 
     // bos bir port bul
-    const tmp = buildApp({ pool: db.pool, credentialKey: Buffer.alloc(32, 1) });
+    const tmp = buildApp({ pool: db.pool, credentialKey: Buffer.alloc(32, 1), sampleIntervalSeconds: 1 });
     await tmp.listen({ port: 0, host: "127.0.0.1" });
     port = (tmp.server.address() as { port: number }).port;
     await tmp.close();
@@ -95,7 +96,12 @@ describe.skipIf(!enabled)("agent <-> API uca-uca (gercek surec)", () => {
     const ts = await rows("mem.used_pct");
     // Kesinti suresi (12 sn) icin de orneklerin geldigi: ardisik ornekler arasi bosluk <= 3 sn (1 sn ornekleme)
     const gaps = ts.slice(1).map((t, i) => t - ts[i]!);
-    expect(Math.max(...gaps), `en buyuk bosluk ms (kesinti geri doldurulmali): ${gaps.join(",")}`).toBeLessThanOrEqual(3000);
+    // Agent varsayilan 5 sn ile baslar, ilk onaydan sonra sunucunun istedigi 1 sn'ye GECER (config.interval_seconds).
+    const firstFast = gaps.findIndex((g) => g <= 1500);
+    expect(firstFast, `agent hic 1 sn'ye gecmedi (config uygulanmiyor): ${gaps.join(",")}`).toBeGreaterThanOrEqual(1);
+    expect(gaps[0]!, "baslangic araligi varsayilan 5 sn olmali").toBeGreaterThanOrEqual(4000);
+    // Gecis sonrasi (kesinti dahil) bosluk yok: ardisik ornekler arasi <= 3 sn, kesinti geri doldurulur.
+    expect(Math.max(...gaps.slice(firstFast)), `en buyuk bosluk ms (kesinti geri doldurulmali): ${gaps.join(",")}`).toBeLessThanOrEqual(3000);
     expect(new Set(ts).size).toBe(ts.length); // yinelenen yok (PK zaten saglar; bos ts yok)
 
     // Agent'in gercek protokolu: 4xx/5xx yok (401 dahil), bearer sema kullanildi

@@ -15,10 +15,10 @@ export interface Kit {
 
 export const KEY = Buffer.alloc(32, 7); // test AES-256 anahtari
 
-export async function setupKit(opts: { spkiPins?: string[] } = {}): Promise<Kit> {
+export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number } = {}): Promise<Kit> {
   const db = await createTestDb();
   const clock = { now: new Date("2026-11-12T12:00:00Z") };
-  const app = buildApp({ pool: db.pool, now: () => clock.now, credentialKey: KEY, spkiPins: opts.spkiPins });
+  const app = buildApp({ pool: db.pool, now: () => clock.now, credentialKey: KEY, spkiPins: opts.spkiPins, sampleIntervalSeconds: opts.sampleIntervalSeconds });
   await app.ready();
   const org = (await db.pool.query("INSERT INTO orgs (name) VALUES ('org') RETURNING id")).rows[0].id as string;
   return { db, app, clock, org, async close() { await app.close(); await db.drop(); } };

@@ -13,7 +13,8 @@ namespace SysMon.Agent.Transport;
 /// </summary>
 public sealed class SamplingPipeline(
     CollectorRunner runner, IBatchSink sink, Func<DateTimeOffset> now, TimeSpan sampleInterval, TimeSpan batchInterval,
-    Action<CollectorStatus>? onStatusChange = null, Action<Exception>? onError = null, int maxBufferedSamples = 20_000)
+    Action<CollectorStatus>? onStatusChange = null, Action<Exception>? onError = null, int maxBufferedSamples = 20_000,
+    SamplingConfig? sampling = null)
 {
     private readonly Dictionary<string, (bool Ok, string? Message)> _lastStatus = [];
     private readonly List<Sample> _buffer = [];
@@ -30,6 +31,7 @@ public sealed class SamplingPipeline(
         {
             do
             {
+                if (sampling is not null && timer.Period != sampling.Interval) timer.Period = sampling.Interval; // sunucu degistirdiyse bir sonraki tikten itibaren
                 var r = await runner.RunOnceAsync(CancellationToken.None);
                 ReportChanges(r.Statuses);
                 _buffer.Add(new Sample(now(), new Dictionary<string, double?>(r.Metrics)));

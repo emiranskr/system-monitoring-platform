@@ -16,10 +16,16 @@ export interface AppOptions {
   /** Ters proxy arkasinda istemci IP'si icin; varsayilan KAPALI (X-Forwarded-For'a guvenilmez). */
   trustProxy?: boolean | string;
   logger?: boolean | { level: string };
+  /** Agent'a ingest yanitinda bildirilen ornekleme araligi (sn, 1..300). Varsayilan 5: depolama butcesi (docs/ilerleme/M2.md). */
+  sampleIntervalSeconds?: number;
 }
 
 export function buildApp(opts: AppOptions): FastifyInstance {
   if (opts.credentialKey.length !== 32) throw new Error("credentialKey 32 bayt olmalidir (AES-256-GCM).");
+  const sampleIntervalSeconds = opts.sampleIntervalSeconds ?? 5;
+  if (!Number.isInteger(sampleIntervalSeconds) || sampleIntervalSeconds < 1 || sampleIntervalSeconds > 300) {
+    throw new Error("sampleIntervalSeconds 1..300 arasi tam sayi olmalidir.");
+  }
   const now = opts.now ?? (() => new Date());
   const app = Fastify({
     logger: opts.logger
@@ -34,7 +40,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     done(null, body);
   });
 
-  registerIngest(app, opts.pool, now);
+  registerIngest(app, opts.pool, now, sampleIntervalSeconds);
   registerEnroll(app, opts.pool, now, opts.credentialKey, opts.spkiPins ?? []);
   registerRotate(app, opts.pool, now, opts.credentialKey);
 

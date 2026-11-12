@@ -43,7 +43,7 @@ declare module "fastify" {
 
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
-export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => Date): void {
+export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => Date, sampleIntervalSeconds: number): void {
   app.route({
     method: "POST",
     url: "/agent/v1/ingest",
@@ -91,7 +91,7 @@ export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => D
       }
 
       const ack = await commit(pool, device, b.spool_epoch, b.seq, { ts, metric, value }, t);
-      return reply.send({ ack_seq: ack, rejected, server_time: iso(t) });
+      return reply.send({ ack_seq: ack, rejected, server_time: iso(t), config: { interval_seconds: sampleIntervalSeconds } });
     },
   });
 

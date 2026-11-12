@@ -45,6 +45,7 @@ public sealed class Uploader
     private readonly HttpClient _http;
     private readonly Uri _ingestUrl;
     private readonly Func<string> _token;
+    private readonly SamplingConfig? _sampling;
     private readonly Func<DateTimeOffset> _now;
 
     private Guid _lastBatchEpoch = Guid.Empty;
@@ -55,7 +56,8 @@ public sealed class Uploader
 
     public long RejectedSamples { get; private set; }
 
-    public Uploader(Spool spool, HttpClient http, Uri server, Func<string> token, AgentOptions options, Func<DateTimeOffset> now)
+    public Uploader(Spool spool, HttpClient http, Uri server, Func<string> token, AgentOptions options, Func<DateTimeOffset> now,
+        SamplingConfig? sampling = null)
     {
         if (!ServerUrlPolicy.IsAllowed(server, options))
             throw new ArgumentException($"Sunucu adresine izin verilmiyor (https gerekli): {server}");
@@ -64,6 +66,7 @@ public sealed class Uploader
         _ingestUrl = new Uri(server, "/agent/v1/ingest");
         _token = token;
         _now = now;
+        _sampling = sampling;
     }
 
     public async Task<UploadOutcome> UploadOnceAsync(CancellationToken ct)
@@ -134,6 +137,7 @@ public sealed class Uploader
             // firlatmaz; dogrulanamayan yanit onay degildir -> batch korunur, yeniden denenir.
             long ack;
             long rejected = 0;
+            JsonElement? serverInterval = null;
             try
             {
                 using var doc = JsonDocument.Parse(text);
@@ -145,6 +149,9 @@ public sealed class Uploader
                     return UploadOutcome.Retry;
                 if (root.TryGetProperty("rejected", out var rej) && rej.ValueKind == JsonValueKind.Number && rej.TryGetInt64(out var rj))
                     rejected = rj;
+                if (root.TryGetProperty("config", out var cfg) && cfg.ValueKind == JsonValueKind.Object
+                    && cfg.TryGetProperty("interval_seconds", out var iv))
+                    serverInterval = iv.Clone();
             }
             catch (JsonException)
             {
@@ -154,6 +161,7 @@ public sealed class Uploader
 
             _consecutivePermanent4xx = 0; // basarili onay kalici hata sayacini sifirlar
             RejectedSamples += rejected;
+            if (serverInterval is { } si) _sampling?.TryApplyServerSeconds(si); // yalniz GECERLI onaydan sonra
             TryApplyServerTime(text);
             _spool.Ack(batch);
             return UploadOutcome.Acked;
