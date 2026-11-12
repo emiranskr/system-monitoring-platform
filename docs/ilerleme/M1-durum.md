@@ -52,6 +52,8 @@ Ayrıntı: `M1-dar-inceleme-3.md`.
 - Daha önce bir testin aralıklı kırıldığı bir koşu görüldü (`Expected: True / Actual: False`); sonraki 5 koşuda tekrarlanmadı, hangi test olduğu yakalanamadı. MIN-03 (bellek testinin paralel koşması) düzeltildi ve olası neden budur, ama kanıtlanmadı.
 - Soak testi `HEAD 0db33a8`'de koşuldu; sonraki tek kod değişikliği test dosyası (`HostTests`) ve belgelerdir.
 
+- **Test süresi (ortam):** Kapanış gününde son koşularda tam takım 2-4 dk sürdü (öncesinde ~25 sn). Tek yavaş test `K3_Acilista_tum_batchler...` (~183 sn; çok sayıda fsync'li yazma). Aynı test eski `Spool.cs` (`0de529b`) ile de ~3 dk 57 sn sürdü: yani gerileme kodda değil, ortamdaki disk/fsync gecikmesinde (nedeni araştırılmadı). Testler yine de geçiyor. Yavaşlık sürerse K3 testinin hacmi düşürülmeli.
+
 ## 5. Kapanış kaydı
 - Birleştirme (hepsi `--ff-only`, yerel): `fix/m1-important-bulgulari` → `feat/m1-review-batch-b` → `feat/m1-agent`. Üç dal `818fe3a`'da. `main`, `feat/m0-foundations` ve `wip/m1-review-batch-b` değişmedi. Push yok.
 - Açık takip işleri (bölüm 3: N-1, N-2, N-4, N-6, N-7, N-8 ve önceki Minor'lar) M1'i engellemez; M2 başında veya ayrı bir sertleştirme görevinde ele alınacak. N-2 düzeltilirse 10 dk soak yeniden koşulmalı.
