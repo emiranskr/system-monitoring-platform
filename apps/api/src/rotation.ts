@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { connectGuarded, releaseGuarded } from "./db.js";
 import type pg from "pg";
 import { RotateRequestSchema, type RotateResponse } from "@sysmon/protocol";
 import { authenticateGuarded } from "./auth.js";
@@ -30,7 +31,7 @@ export function registerRotate(app: FastifyInstance, pool: pg.Pool, now: () => D
       const auth = req.auth!;
       const t = now();
 
-      const c = await pool.connect();
+      const c = await connectGuarded(pool);
       try {
         await c.query("BEGIN");
         const cur = await c.query<{ superseded_by: Buffer | null; overlap_expires_at: Date | null; rotation_id: string | null }>(
@@ -61,7 +62,7 @@ export function registerRotate(app: FastifyInstance, pool: pg.Pool, now: () => D
         try { await c.query("ROLLBACK"); } catch { /* zaten bitmis olabilir */ }
         throw e;
       } finally {
-        c.release();
+        releaseGuarded(c);
       }
     },
   });

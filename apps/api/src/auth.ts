@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { connectGuarded, releaseGuarded } from "./db.js";
 import { hashToken, parseBearer } from "./tokens.js";
 import { HttpError, unauthorized } from "./errors.js";
 import { rateLimited, type RateLimiter } from "./ratelimit.js";
@@ -6,18 +7,19 @@ import { rateLimited, type RateLimiter } from "./ratelimit.js";
 export interface AuthedDevice { orgId: string; deviceId: string; tokenHash: Buffer }
 
 /**
- * IP basina basarisiz-kimlik-dogrulama siniriyla korunmus dogrulama: sinira ulasan IP'den gecerli token bile 429
- * (veritabani sorgusu yapilmadan); basarisiz her deneme IP sayacini artirir. IP, Fastify'in req.ip'sidir: trustProxy
- * KAPALIYKEN X-Forwarded-For YOK SAYILIR (sahte basliklarla sinir asilamaz).
+ * IP basina basarisiz-kimlik-dogrulama sayaciyla korunmus dogrulama: basarisiz her deneme IP sayacini artirir, sinir
+ * asildiktan sonra GECERSIZ istekler 429 alir; gecerli token'lar etkilenmez. IP, Fastify'in req.ip'sidir: trustProxy
+ * KAPALIYKEN X-Forwarded-For YOK SAYILIR; acikken yalniz acik atlama sayisi/CIDR listesiyle (bkz. config.ts).
  */
 export async function authenticateGuarded(
   pool: pg.Pool, req: { ip: string; headers: { authorization?: string } }, now: Date, failed: RateLimiter,
 ): Promise<AuthedDevice> {
-  if (failed.isLimited(req.ip)) throw rateLimited(failed);
   try {
     return await authenticate(pool, req.headers.authorization, now);
   } catch (e) {
-    if (e instanceof HttpError && e.status === 401) failed.hit(req.ip);
+    // GECERLI token'lar sinirdan etkilenmez (inceleme I-2: aksi halde baskasinin/paylasilan IP'sinden basarisiz denemeler
+    // gondererek filo kilitlenebilirdi). Yalniz GECERSIZ istekler sayilir; sinir asilinca 401 yerine 429 alirlar.
+    if (e instanceof HttpError && e.status === 401 && !failed.hit(req.ip)) throw rateLimited(failed);
     throw e;
   }
 }
@@ -67,7 +69,7 @@ export async function authenticate(pool: pg.Pool, header: string | undefined, no
 }
 
 async function revokeAfterReuse(pool: pg.Pool, orgId: string, deviceId: string, oldHash: Buffer, newHash: Buffer, now: Date): Promise<void> {
-  const c = await pool.connect();
+  const c = await connectGuarded(pool);
   try {
     await c.query("BEGIN");
     await c.query("UPDATE device_tokens SET revoked_at=$3 WHERE token_hash = ANY($1::bytea[]) AND device_id=$2 AND revoked_at IS NULL", [[oldHash, newHash], deviceId, now]);
@@ -79,6 +81,6 @@ async function revokeAfterReuse(pool: pg.Pool, orgId: string, deviceId: string, 
     try { await c.query("ROLLBACK"); } catch { /* baglanti kopmus olabilir */ }
     throw e;
   } finally {
-    c.release();
+    releaseGuarded(c);
   }
 }

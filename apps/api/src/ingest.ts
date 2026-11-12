@@ -1,4 +1,5 @@
 import { gunzip } from "node:zlib";
+import { connectGuarded, releaseGuarded } from "./db.js";
 import { promisify } from "node:util";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type pg from "pg";
@@ -126,7 +127,7 @@ async function commit(
   pool: pg.Pool, d: Device, epoch: string, seq: number,
   rows: { ts: string[]; metric: string[]; value: (number | null)[] }, t: Date,
 ): Promise<number> {
-  const c = await pool.connect();
+  const c = await connectGuarded(pool);
   try {
     await c.query("BEGIN");
     await c.query(
@@ -158,6 +159,6 @@ async function commit(
     try { await c.query("ROLLBACK"); } catch { /* baglanti kopmus olabilir */ }
     throw e;
   } finally {
-    c.release();
+    releaseGuarded(c);
   }
 }

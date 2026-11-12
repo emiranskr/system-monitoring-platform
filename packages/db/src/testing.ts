@@ -37,6 +37,7 @@ export async function createTestDb(): Promise<TestDb> {
   const url = new URL(base);
   url.pathname = `/${name}`;
   const pool = new pg.Pool({ connectionString: url.toString(), max: 10 });
+  pool.on("error", () => undefined); // test duzeni: bosta baglanti kopmasi (ornegin DROP DATABASE WITH FORCE) sureci dusurmesin
   await migrate(pool);
 
   return {

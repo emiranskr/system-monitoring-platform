@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { connectGuarded, releaseGuarded } from "./db.js";
 import type { FastifyInstance } from "fastify";
 import type pg from "pg";
 import { EnrollRequestSchema, type EnrollResponse } from "@sysmon/protocol";
@@ -46,7 +47,7 @@ export function registerEnroll(app: FastifyInstance, pool: pg.Pool, now: () => D
     const t = now();
     const machine = sha(b.machine_guid);
 
-    const c = await pool.connect();
+    const c = await connectGuarded(pool);
     try {
       await c.query("BEGIN");
       // Token satirini KILITLE: ayni token ile eszamanli istekler siraya girer (tam bir basari).
@@ -84,7 +85,7 @@ export function registerEnroll(app: FastifyInstance, pool: pg.Pool, now: () => D
       try { await c.query("ROLLBACK"); } catch { /* zaten geri alinmis olabilir */ }
       throw e;
     } finally {
-      c.release();
+      releaseGuarded(c);
     }
   });
 }

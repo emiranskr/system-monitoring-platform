@@ -15,7 +15,7 @@ export interface AppOptions {
   /** Enjekte edilebilir saat (testler icin). */
   now?: () => Date;
   /** Ters proxy arkasinda istemci IP'si icin; varsayilan KAPALI (X-Forwarded-For'a guvenilmez). */
-  trustProxy?: boolean | string;
+  trustProxy?: boolean | string | string[];
   logger?: boolean | { level: string };
   /** Agent'a ingest yanitinda bildirilen ornekleme araligi (sn, 1..300). Varsayilan 5: depolama butcesi (docs/ilerleme/M2.md). */
   sampleIntervalSeconds?: number;

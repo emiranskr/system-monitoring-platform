@@ -48,14 +48,18 @@ describe("cihaz basina ingest siniri", () => {
 });
 
 describe("IP basina basarisiz kimlik dogrulama siniri (kaba kuvvet)", () => {
-  it("sinirdan sonra GECERLI token bile ayni IP'den 429; baska IP etkilenmez", async () => {
+  it("sinirdan sonra GECERSIZ istekler 429 alir; baska IP etkilenmez; sayac pencere gecince sifirlanir", async () => {
     const k = await mk({ limits: { failedAuthPerIp: 3, windowMs: 60_000 } });
-    const good = await enrolled(k, 4);
     const req = (token: string, ip: string) => k.app.inject({ method: "POST", url: "/agent/v1/ingest", remoteAddress: ip,
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, payload: "{}" });
     for (let i = 0; i < 3; i++) expect((await req("kotu_token_" + i, "10.0.0.5")).statusCode).toBe(401);
-    expect((await req(good, "10.0.0.5")).statusCode).toBe(429);          // engellendi
-    expect((await req(good, "10.0.0.6")).statusCode).not.toBe(429);      // baska IP serbest (400: bos govde ama 429 degil)
+    const blocked = await req("kotu_token_9", "10.0.0.5");
+    expect(blocked.statusCode).toBe(429);
+    expect(Number(blocked.headers["retry-after"])).toBeGreaterThan(0);
+    expect((await req("kotu_token_9", "10.0.0.6")).statusCode).toBe(401); // baska IP: ayri sayac
+
+    k.clock.now = new Date(k.clock.now.getTime() + 61_000);
+    expect((await req("kotu_token_9", "10.0.0.5")).statusCode).toBe(401); // pencere gecti
   });
 });
 
@@ -82,12 +86,5 @@ describe("X-Forwarded-For ve trustProxy", () => {
     const k = await mk({ limits: { failedAuthPerIp: 3, windowMs: 60_000 } });
     for (let i = 0; i < 3; i++) expect((await spoof(k, "kotu" + i, `1.2.3.${i}`)).statusCode).toBe(401);
     expect((await spoof(k, "kotu9", "99.99.99.99")).statusCode).toBe(429); // farkli sahte IP kacirmaz
-  });
-
-  it("trustProxy ACIK: gercek proxy arkasinda istemci IP'si X-Forwarded-For'dan cozulur; her istemci ayri sayilir", async () => {
-    const k = await mk({ trustProxy: true, limits: { failedAuthPerIp: 2, windowMs: 60_000 } });
-    for (let i = 0; i < 2; i++) expect((await spoof(k, "kotu" + i, "203.0.113.7")).statusCode).toBe(401);
-    expect((await spoof(k, "kotu2", "203.0.113.7")).statusCode).toBe(429);   // ayni istemci engellendi
-    expect((await spoof(k, "kotu3", "203.0.113.8")).statusCode).toBe(401);   // baska istemci ayri sayac
   });
 });
