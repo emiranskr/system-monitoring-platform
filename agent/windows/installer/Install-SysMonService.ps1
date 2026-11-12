@@ -113,11 +113,11 @@ try {
 
     # 5) PDH izni: A5 gercek-Windows olcumu (ADR 0004): uyelik OLMADAN PDH sayaci eklenemiyor (0xC0000BC8) -> varsayilan ACIK
     if (-not $SkipPerfMonUsers) {
-        $grp = Get-LocalGroupNameBySid 'S-1-5-32-558'
-        # cmd /c: PowerShell 5.1, ErrorActionPreference=Stop altinda native stderr satirlarini istisnaya cevirir
-        & cmd.exe /c "net localgroup ""$grp"" ""$account"" /add >nul 2>&1"
-        # 0 = eklendi, 2 = zaten uye; digerleri hata
-        if ($LASTEXITCODE -notin 0, 2) { throw "Performance Monitor Users uyeligi eklenemedi (net cikis $LASTEXITCODE)" }
+        # net.exe uzun hesap adlarinda ("Bu komutun sozdizimi") sozdizimi hatasi verir (A5'te gercek makinede goruldu: 21+ karakterli
+        # servis adi). Add-LocalGroupMember adi uzunluk sinirina takilmaz; grup SID ile verilir (yerellestirilmis ad gerekmez).
+        try { Add-LocalGroupMember -SID 'S-1-5-32-558' -Member $account -ErrorAction Stop }
+        catch [Microsoft.PowerShell.Commands.MemberExistsException] { <# zaten uye: sorun degil #> }
+        catch { throw "Performance Monitor Users uyeligi eklenemedi: $($_.Exception.Message)" }
         $addedGroup = $true
     }
 
@@ -141,12 +141,13 @@ try {
 catch {
     $err = $_
     # Geri alma: yarim kurulum LocalSystem/Otomatik servis veya artik dizin birakmamali. Temizlik hatalari asil hatayi gizlemez.
+    # Uyelik SERVIS SILINMEDEN ONCE kaldirilir (silindikten sonra hesap cozulemez, grupta yetim SID kalirdi).
+    if ($addedGroup) {
+        try { Remove-LocalGroupMember -SID 'S-1-5-32-558' -Member $account -ErrorAction Stop } catch { }
+    }
     if ($createdService) {
         try { Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue } catch { }
         try { & sc.exe delete $ServiceName | Out-Null } catch { }
-    }
-    if ($addedGroup) {
-        try { $g = Get-LocalGroupNameBySid 'S-1-5-32-558'; & cmd.exe /c "net localgroup ""$g"" ""$account"" /delete >nul 2>&1" } catch { }
     }
     if ($createdDataDir) { try { Remove-Item -Recurse -Force $DataDir -ErrorAction SilentlyContinue } catch { } }
     if ($createdInstallDir) { try { Remove-Item -Recurse -Force $InstallDir -ErrorAction SilentlyContinue } catch { } }

@@ -17,6 +17,10 @@ $dataDir = Join-Path $env:ProgramData 'SysMon-verify\agent'
 $script:ok = $true
 
 function Log([string]$m) { Add-Content -Path $LogPath -Value ("[{0:HH:mm:ss}] {1}" -f (Get-Date), $m) -Encoding UTF8 }
+# Performance Monitor Users uyelik sayisi: bastaki ve sondaki deger esit olmali (yetim SID/sizinti yok). Ad yerellestirilmis olabilir: SID'den.
+$perfGroup = ((New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-32-558').Translate([System.Security.Principal.NTAccount]).Value).Split([char]92)[-1]
+function GroupLineCount { @(& cmd.exe /c "net localgroup ""$perfGroup"" 2>nul").Count }
+$groupBefore = GroupLineCount
 function Check([string]$name, [bool]$cond, [string]$detail = '') {
     if (-not $cond) { $script:ok = $false }
     Log ("{0,-6} {1} {2}" -f ($(if ($cond) { 'GECTI' } else { 'KALDI' }), $name, $detail))
@@ -158,7 +162,7 @@ try {
     Check 'Basarisiz kurulum hata verdi' $threw
     Check 'Basarisiz kurulum: servis KALMADI (LocalSystem/Otomatik birakilmadi)' (-not (Get-Service $failName -ErrorAction SilentlyContinue))
     Check 'Basarisiz kurulum: program dizini geri alindi' (-not (Test-Path $failInstall))
-    $grpNow = (& cmd.exe /c 'net localgroup "Performance Monitor Users" 2>nul') -join ' '
+    $grpNow = (& cmd.exe /c "net localgroup ""$perfGroup"" 2>nul") -join ' '
     Check 'Basarisiz kurulum: Performance Monitor Users uyeligi geri alindi' ($grpNow -notmatch $failName)
 
     $failData = Join-Path $env:ProgramData 'SysMon-verify-fail\agent'
@@ -187,6 +191,8 @@ finally {
         }
         Check 'Temizlik: asama 4 servisi/dizinleri kalmadi' (-not (Get-Service 'SysMonAgentVerifyFail' -ErrorAction SilentlyContinue) -and -not (Test-Path (Join-Path $env:ProgramFiles 'SysMon-verify-fail')) -and -not (Test-Path (Join-Path $env:ProgramData 'SysMon-verify-fail')))
         Check 'Temizlik: dizinler silindi' (-not (Test-Path $installDir) -and -not (Test-Path $dataDir))
+        $groupAfter = GroupLineCount
+        Check 'Temizlik: Performance Monitor Users grubu basa dondu (yetim SID/sizinti yok)' ($groupAfter -eq $groupBefore) "once=$groupBefore sonra=$groupAfter"
     } catch { Log "TEMIZLIK HATASI: $($_.Exception.Message)"; $script:ok = $false }
     Log "BITTI sonuc=$(if ($script:ok) { 'BASARILI' } else { 'BASARISIZ' })"
 }

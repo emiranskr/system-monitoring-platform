@@ -12,6 +12,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $account = "NT SERVICE\$ServiceName"
 
+# Performance Monitor Users uyeligi (varsa) SERVIS SILINMEDEN ONCE kaldirilir: silindikten sonra hesap cozulemez ve grupta
+# yetim SID kalirdi. Uye degilse hata onemsizdir. (net.exe uzun adlarda sozdizimi hatasi verdigi icin cmdlet kullanilir.)
+try { Remove-LocalGroupMember -SID 'S-1-5-32-558' -Member $account -ErrorAction Stop } catch { }
+
 $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($svc) {
     if ($svc.Status -ne 'Stopped') {
@@ -21,11 +25,6 @@ if ($svc) {
     & sc.exe delete $ServiceName | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'sc delete basarisiz' }
 }
-
-# Performance Monitor Users uyeligi (varsa) temizlenir
-$grp = ((New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-32-558').Translate([System.Security.Principal.NTAccount]).Value).Split('\')[-1]
-& cmd.exe /c "net localgroup ""$grp"" ""$account"" /delete >nul 2>&1"
-# uye degilse net hata verir (1377); kaldirma icin onemsiz
 
 if (Test-Path $InstallDir) { Remove-Item -Recurse -Force $InstallDir }
 $parent = Split-Path $InstallDir -Parent
