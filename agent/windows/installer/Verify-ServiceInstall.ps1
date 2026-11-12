@@ -143,6 +143,31 @@ try {
     $hasRetryWarn = [bool]($agentLog3 | Select-String 'Yukleme basarisiz')
     Check 'Servis hesabi korumali token deposunu OKUYABILIYOR (olumlu sinyal: "Token yuklendi" satiri var, "yok/okunamadi" yok)' ($tokenLoaded -and -not $tokenMissing)
     Check 'Yukleme dongusu calisiyor (sunucu yok: baglanti hatasi uyarisi var)' $hasRetryWarn
+
+    # --- Asama 4 (M-4): BILEREK basarisiz kurulum. Servis olusturulduktan SONRA hata cikarsa (mevcut olmayan surucude veri dizini)
+    # servis LocalSystem/Otomatik olarak KALMAMALI, dizinler geri alinmali, ayni ad sonra yeniden kurulabilmeli.
+    $failName = 'SysMonAgentVerifyFail'
+    $failInstall = Join-Path $env:ProgramFiles 'SysMon-verify-fail\Agent'
+    $usedDrives = @((Get-PSDrive -PSProvider FileSystem).Name)
+    $badDrive = @('Z','Y','X','W','V','U','T','S','R','Q') | Where-Object { $_ -notin $usedDrives } | Select-Object -First 1
+    $threw = $false
+    try {
+        & (Join-Path $here 'Install-SysMonService.ps1') -SourceDir $PublishDir -InstallDir $failInstall `
+            -DataDir ("{0}:\sysmon-yok\agent" -f $badDrive) -ServiceName $failName | Out-Null
+    } catch { $threw = $true; Log "BILGI beklenen kurulum hatasi: $($_.Exception.Message)" }
+    Check 'Basarisiz kurulum hata verdi' $threw
+    Check 'Basarisiz kurulum: servis KALMADI (LocalSystem/Otomatik birakilmadi)' (-not (Get-Service $failName -ErrorAction SilentlyContinue))
+    Check 'Basarisiz kurulum: program dizini geri alindi' (-not (Test-Path $failInstall))
+    $grpNow = (& cmd.exe /c 'net localgroup "Performance Monitor Users" 2>nul') -join ' '
+    Check 'Basarisiz kurulum: Performance Monitor Users uyeligi geri alindi' ($grpNow -notmatch $failName)
+
+    $failData = Join-Path $env:ProgramData 'SysMon-verify-fail\agent'
+    & (Join-Path $here 'Install-SysMonService.ps1') -SourceDir $PublishDir -InstallDir $failInstall -DataDir $failData -ServiceName $failName | Out-Null
+    $re = Get-CimInstance Win32_Service -Filter "Name='$failName'"
+    Check 'Yeniden kurulum mumkun: servis var, sanal hesap, Otomatik (gecikmeli)' ($re -and $re.StartName -eq "NT SERVICE\$failName" -and $re.StartMode -eq 'Auto')
+    $ff = (& sc.exe qfailureflag $failName) -join ' '
+    Check 'Failure flag aktif (zarif durmada da yeniden baslatma)' ($ff -match 'TRUE|1')
+    & (Join-Path $here 'Uninstall-SysMonService.ps1') -InstallDir $failInstall -DataDir $failData -ServiceName $failName -RemoveData | Out-Null
 }
 catch {
     $script:ok = $false
@@ -152,6 +177,15 @@ finally {
     try {
         & (Join-Path $here 'Uninstall-SysMonService.ps1') -InstallDir $installDir -DataDir $dataDir -ServiceName $svcName -RemoveData | Out-Null
         Check 'Temizlik: servis silindi' (-not (Get-Service $svcName -ErrorAction SilentlyContinue))
+        # Asama 4'un artiklari (hata sirasinda kalmis olabilir)
+        if (Get-Service 'SysMonAgentVerifyFail' -ErrorAction SilentlyContinue) {
+            & (Join-Path $here 'Uninstall-SysMonService.ps1') -InstallDir (Join-Path $env:ProgramFiles 'SysMon-verify-fail\Agent') `
+                -DataDir (Join-Path $env:ProgramData 'SysMon-verify-fail\agent') -ServiceName 'SysMonAgentVerifyFail' -RemoveData | Out-Null
+        }
+        foreach ($d in @((Join-Path $env:ProgramFiles 'SysMon-verify-fail'), (Join-Path $env:ProgramData 'SysMon-verify-fail'))) {
+            if (Test-Path $d) { Remove-Item -Recurse -Force $d }
+        }
+        Check 'Temizlik: asama 4 servisi/dizinleri kalmadi' (-not (Get-Service 'SysMonAgentVerifyFail' -ErrorAction SilentlyContinue) -and -not (Test-Path (Join-Path $env:ProgramFiles 'SysMon-verify-fail')) -and -not (Test-Path (Join-Path $env:ProgramData 'SysMon-verify-fail')))
         Check 'Temizlik: dizinler silindi' (-not (Test-Path $installDir) -and -not (Test-Path $dataDir))
     } catch { Log "TEMIZLIK HATASI: $($_.Exception.Message)"; $script:ok = $false }
     Log "BITTI sonuc=$(if ($script:ok) { 'BASARILI' } else { 'BASARISIZ' })"
