@@ -38,4 +38,5 @@ if (options.ImportToken is not null)
 
 using var host = AgentHost.Build(options, []);
 await host.RunAsync();
-return 0;
+// Worker (ornegin InstanceLock alinamadi) Environment.ExitCode'u ayarlar; int donusu bunu ezmemeli.
+return Environment.ExitCode;

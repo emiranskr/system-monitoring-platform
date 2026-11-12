@@ -51,7 +51,11 @@ public sealed class HostTests : IDisposable
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await host.WaitForShutdownAsync(cts.Token);
 
-        Assert.Equal(1, Environment.ExitCode);
-        Assert.False(Directory.Exists(Path.Combine(_dataDir, "spool")));
+        try
+        {
+            Assert.Equal(1, Environment.ExitCode);
+            Assert.False(Directory.Exists(Path.Combine(_dataDir, "spool")));
+        }
+        finally { Environment.ExitCode = 0; } // statik deger diger testlere sizmasin
     }
 }
