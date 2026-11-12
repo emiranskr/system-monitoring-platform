@@ -1,8 +1,26 @@
 import type pg from "pg";
 import { hashToken, parseBearer } from "./tokens.js";
-import { unauthorized } from "./errors.js";
+import { HttpError, unauthorized } from "./errors.js";
+import { rateLimited, type RateLimiter } from "./ratelimit.js";
 
 export interface AuthedDevice { orgId: string; deviceId: string; tokenHash: Buffer }
+
+/**
+ * IP basina basarisiz-kimlik-dogrulama siniriyla korunmus dogrulama: sinira ulasan IP'den gecerli token bile 429
+ * (veritabani sorgusu yapilmadan); basarisiz her deneme IP sayacini artirir. IP, Fastify'in req.ip'sidir: trustProxy
+ * KAPALIYKEN X-Forwarded-For YOK SAYILIR (sahte basliklarla sinir asilamaz).
+ */
+export async function authenticateGuarded(
+  pool: pg.Pool, req: { ip: string; headers: { authorization?: string } }, now: Date, failed: RateLimiter,
+): Promise<AuthedDevice> {
+  if (failed.isLimited(req.ip)) throw rateLimited(failed);
+  try {
+    return await authenticate(pool, req.headers.authorization, now);
+  } catch (e) {
+    if (e instanceof HttpError && e.status === 401) failed.hit(req.ip);
+    throw e;
+  }
+}
 
 /**
  * Bearer token'dan cihazi cozer. Gecerlilik: iptal edilmemis, suresi dolmamis, cihaz iptal edilmemis.

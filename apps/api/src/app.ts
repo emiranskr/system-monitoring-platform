@@ -4,6 +4,7 @@ import { HttpError } from "./errors.js";
 import { registerEnroll } from "./enrollment.js";
 import { registerIngest, MAX_COMPRESSED_BYTES } from "./ingest.js";
 import { registerRotate } from "./rotation.js";
+import { createLimiters, type Limits } from "./ratelimit.js";
 
 export interface AppOptions {
   pool: pg.Pool;
@@ -18,6 +19,8 @@ export interface AppOptions {
   logger?: boolean | { level: string };
   /** Agent'a ingest yanitinda bildirilen ornekleme araligi (sn, 1..300). Varsayilan 5: depolama butcesi (docs/ilerleme/M2.md). */
   sampleIntervalSeconds?: number;
+  /** Hiz sinirlari (varsayilanlar ratelimit.ts'te). */
+  limits?: Limits;
 }
 
 export function buildApp(opts: AppOptions): FastifyInstance {
@@ -40,12 +43,13 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     done(null, body);
   });
 
-  registerIngest(app, opts.pool, now, sampleIntervalSeconds);
-  registerEnroll(app, opts.pool, now, opts.credentialKey, opts.spkiPins ?? []);
-  registerRotate(app, opts.pool, now, opts.credentialKey);
+  const limiters = createLimiters(opts.limits, now);
+  registerIngest(app, opts.pool, now, sampleIntervalSeconds, limiters);
+  registerEnroll(app, opts.pool, now, opts.credentialKey, opts.spkiPins ?? [], limiters);
+  registerRotate(app, opts.pool, now, opts.credentialKey, limiters);
 
   app.setErrorHandler((err: Error & { statusCode?: number; code?: string }, _req, reply) => {
-    if (err instanceof HttpError) return reply.status(err.status).send({ error: err.code, ...err.extra });
+    if (err instanceof HttpError) return reply.status(err.status).headers(err.headers).send({ error: err.code, ...err.extra });
     // Fastify'in kendi hatalari (govde cok buyuk 413, desteklenmeyen ortam 415, gecersiz govde 400)
     if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
       const code = err.statusCode === 413 ? "payload_too_large" : err.statusCode === 415 ? "unsupported_media_type" : "bad_request";

@@ -4,7 +4,8 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type pg from "pg";
 import { z } from "zod";
 import { MAX_SAMPLES_PER_BATCH, METRIC_NAME_RE, MetricValueSchema } from "@sysmon/protocol";
-import { authenticate, type AuthedDevice } from "./auth.js";
+import { authenticateGuarded, type AuthedDevice } from "./auth.js";
+import { rateLimited, type Limiters } from "./ratelimit.js";
 import { HttpError } from "./errors.js";
 
 const gunzipAsync = promisify(gunzip);
@@ -43,13 +44,15 @@ declare module "fastify" {
 
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
-export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => Date, sampleIntervalSeconds: number): void {
+export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => Date, sampleIntervalSeconds: number, limiters: Limiters): void {
   app.route({
     method: "POST",
     url: "/agent/v1/ingest",
     // Kimlik dogrulama govde okunmadan ONCE: yetkisiz istek icin govde islenmez.
     onRequest: async (req: FastifyRequest) => {
-      req.auth = await authenticate(pool, req.headers.authorization, now());
+      req.auth = await authenticateGuarded(pool, req, now(), limiters.failedAuthPerIp);
+      // Cihaz basina sinir (kimlik dogrulamadan SONRA): sinirlanan istek veri yazmaz, agent ayni batch'i sonra yeniden dener.
+      if (!limiters.ingestPerDevice.hit(req.auth.deviceId)) throw rateLimited(limiters.ingestPerDevice);
     },
     handler: async (req, reply) => {
       const device: Device = { orgId: req.auth!.orgId, deviceId: req.auth!.deviceId };

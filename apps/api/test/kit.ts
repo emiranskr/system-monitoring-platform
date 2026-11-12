@@ -2,7 +2,7 @@ import { gzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { createTestDb, type TestDb } from "@sysmon/db/testing";
-import { buildApp } from "../src/app.js";
+import { buildApp, type AppOptions } from "../src/app.js";
 
 /** Testler icin ortak duzen: gercek TimescaleDB (gecici DB) + gercek Fastify + enjekte edilebilir saat. */
 export interface Kit {
@@ -15,10 +15,12 @@ export interface Kit {
 
 export const KEY = Buffer.alloc(32, 7); // test AES-256 anahtari
 
-export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number } = {}): Promise<Kit> {
+export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number; trustProxy?: boolean; limits?: AppOptions["limits"] } = {}): Promise<Kit> {
   const db = await createTestDb();
   const clock = { now: new Date("2026-11-12T12:00:00Z") };
-  const app = buildApp({ pool: db.pool, now: () => clock.now, credentialKey: KEY, spkiPins: opts.spkiPins, sampleIntervalSeconds: opts.sampleIntervalSeconds });
+  const app = buildApp({ pool: db.pool, now: () => clock.now, credentialKey: KEY, spkiPins: opts.spkiPins, sampleIntervalSeconds: opts.sampleIntervalSeconds, trustProxy: opts.trustProxy,
+    // Sinir testleri disindaki testler cok sayida istegi ayni IP'den ve sabit saatle yapar: sinirlar yuksek tutulur.
+    limits: opts.limits ?? { enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000 } });
   await app.ready();
   const org = (await db.pool.query("INSERT INTO orgs (name) VALUES ('org') RETURNING id")).rows[0].id as string;
   return { db, app, clock, org, async close() { await app.close(); await db.drop(); } };

@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import type pg from "pg";
 import { RotateRequestSchema, type RotateResponse } from "@sysmon/protocol";
-import { authenticate } from "./auth.js";
+import { authenticateGuarded } from "./auth.js";
+import { rateLimited, type Limiters } from "./ratelimit.js";
 import { decrypt, encrypt, newCredential } from "./crypto.js";
 import { badRequest, HttpError } from "./errors.js";
 import { hashToken } from "./tokens.js";
@@ -14,9 +15,12 @@ const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
  * kadar (en cok 24 saat) gecerli kalir. Ayni rotation_id ayni credential'i dondurur; bekleyen rotation varken farkli
  * rotation_id 409. Yeni credential ilk kullanilana kadar AES-GCM sifreli saklanir.
  */
-export function registerRotate(app: FastifyInstance, pool: pg.Pool, now: () => Date, key: Buffer): void {
+export function registerRotate(app: FastifyInstance, pool: pg.Pool, now: () => Date, key: Buffer, limiters: Limiters): void {
   app.post("/agent/v1/rotate", {
-    onRequest: async (req) => { req.auth = await authenticate(pool, req.headers.authorization, now()); },
+    onRequest: async (req) => {
+      req.auth = await authenticateGuarded(pool, req, now(), limiters.failedAuthPerIp);
+      if (!limiters.rotatePerDevice.hit(req.auth.deviceId)) throw rateLimited(limiters.rotatePerDevice);
+    },
     handler: async (req, reply) => {
       let json: unknown;
       try { json = JSON.parse((req.body as Buffer).toString("utf8")); } catch { throw badRequest(); }
