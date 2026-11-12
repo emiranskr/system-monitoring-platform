@@ -102,6 +102,18 @@ try {
 
     # --- Asama 3: token deposu: DPAPI + ACL + servis hesabi okuyabiliyor mu ---
     Stop-Service $svcName -Force; (Get-Service $svcName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+
+    # Negatif kontrol (I-4): token HENUZ aktarilmadi. Servis --server ile baslarsa gunluk "token deposu yok" demeli ve
+    # "Token yuklendi" ASLA yazmamali. Bu, asagidaki olumlu kontrolun bos (vacuous) olmadigini kanitlar.
+    $logFile = Join-Path $dataDir 'logs' | Join-Path -ChildPath 'agent.log'
+    $markNeg = @(Get-Content $logFile -ErrorAction SilentlyContinue).Count
+    Install -Perf -Server 'https://127.0.0.1:59999'
+    Start-Sleep -Seconds 20
+    $negLines = @(Get-Content $logFile -ErrorAction SilentlyContinue | Select-Object -Skip $markNeg)
+    Check 'Negatif kontrol: token yokken gunluk "Korumali token deposu yok" diyor' ([bool]($negLines | Select-String 'Korumali token deposu yok'))
+    Check 'Negatif kontrol: token yokken "Token yuklendi" YAZILMIYOR' (-not [bool]($negLines | Select-String 'Token yuklendi'))
+    Stop-Service $svcName -Force; (Get-Service $svcName).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+
     $plain = Join-Path $env:TEMP "sysmon-bootstrap-$([guid]::NewGuid().ToString('N')).txt"
     $secret = 'tok_' + [guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N')
     Set-Content -Path $plain -Value $secret -Encoding ASCII
@@ -120,15 +132,16 @@ try {
     Check 'token.bin ACL: servis hesabi var, Users/Everyone yok' (($tokAcl | Where-Object { $_ -like "*$svcName*" }) -and -not ($tokAcl | Where-Object { $_ -match 'Everyone|BUILTIN\\Users|Herkes' }))
 
     # Servis hesabi token'i okuyabiliyor mu? --server ile baslat (dinleyen sunucu yok: baglanti reddi = gecici hata beklenir)
-    $t0 = Get-Date
+    # Yalniz BU yeniden baslatmadan sonra yazilan satirlar degerlendirilir (eski satirlar sonucu etkilemesin).
+    $markPos = @(Get-Content $logFile -ErrorAction SilentlyContinue).Count
     Install -Perf -Server 'https://127.0.0.1:59999'
     Start-Sleep -Seconds 25
-    $agentLog3 = @(Get-Content (Join-Path $dataDir 'logs' | Join-Path -ChildPath 'agent.log') -ErrorAction SilentlyContinue)
+    $agentLog3 = @(Get-Content $logFile -ErrorAction SilentlyContinue | Select-Object -Skip $markPos)
     foreach ($l in ($agentLog3 | Select-Object -Last 8)) { Log "AGENTLOG $l" }
-    $tokenMissing = [bool]($agentLog3 | Select-String 'Korumali token deposu yok')
+    $tokenLoaded = [bool]($agentLog3 | Select-String 'Token yuklendi')
+    $tokenMissing = [bool]($agentLog3 | Select-String 'Korumali token (deposu yok|okunamadi)')
     $hasRetryWarn = [bool]($agentLog3 | Select-String 'Yukleme basarisiz')
-    $uploadEnabled = [bool]($agentLog3 | Select-String 'Yukleme etkin: sunucu')
-    Check 'Servis hesabi korumali token deposunu OKUYABILIYOR ("Yukleme etkin ... token okundu" satiri var, "token deposu yok" yok)' ($uploadEnabled -and -not $tokenMissing)
+    Check 'Servis hesabi korumali token deposunu OKUYABILIYOR (olumlu sinyal: "Token yuklendi" satiri var, "yok/okunamadi" yok)' ($tokenLoaded -and -not $tokenMissing)
     Check 'Yukleme dongusu calisiyor (sunucu yok: baglanti hatasi uyarisi var)' $hasRetryWarn
 }
 catch {

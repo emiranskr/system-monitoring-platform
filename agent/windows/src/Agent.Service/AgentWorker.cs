@@ -66,11 +66,12 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
         if (options.Server is not null)
         {
             var store = new TokenStore(AgentPaths.TokenStorePath(options));
-            // Token gecidi kaldirildi: baslangicta token olmasa bile yukleme dongusu baslatilir;
-            // token daha sonra aktarildiginda veya degistiginde (401/403 5 dk aralikla denenirken)
-            // servis yeniden baslatilmadan toparlanir.
+            // Token gecidi kaldirildi: baslangicta token olmasa bile yukleme dongusu baslatilir; token yoksa/okunamazsa
+            // istek GONDERILMEZ (AuthFailed), durum degisiminde loglanir; token aktarilinca servis yeniden baslatilmadan toparlanir.
+            var tokens = new TokenProvider(store.Path, () => (store.TryLoad(out var t), t), () => File.Exists(store.Path),
+                m => log.LogInformation("{Message}", m), m => log.LogWarning("{Message}", m));
             uploader = new Uploader(spool, HttpClients.Create(options.ServerPins), new Uri(options.Server),
-                () => ReadToken(store),
+                tokens.Get,
                 options, () => DateTimeOffset.UtcNow);
 
             uploader.BatchDropped += (batch, status) =>
@@ -100,10 +101,6 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
         loss.CheckCounters();
     }
 
-    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    private static string ReadToken(TokenStore store) =>
-        store.TryLoad(out var t) ? t! : "";
-
     private async Task UploadLoop(Uploader uploader, CancellationToken ct)
     {
         var runner = new UploadRunner(uploader.UploadOnceAsync, Task.Delay, new Random(),
@@ -112,7 +109,7 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
                 if (outcome == UploadOutcome.TlsRejected)
                     log.LogError("Sunucu sertifikasi dogrulanamadi (SPKI pin / sertifika); veri ve token gonderilmedi. {Wait:0} sn sonra yeniden denenecek.", wait.TotalSeconds);
                 else if (outcome == UploadOutcome.AuthFailed)
-                    log.LogWarning("Sunucu kimlik bilgisini reddetti (401/403). {Wait:0} sn sonra yeniden denenecek; token guncellenirse yukleme devam eder.", wait.TotalSeconds);
+                    log.LogWarning("Kimlik dogrulama yapilamadi: sunucu 401/403 verdi veya token yok/okunamadi (oncesindeki 'Token' satirina bakin). {Wait:0} sn sonra yeniden denenecek.", wait.TotalSeconds);
                 else if (outcome == UploadOutcome.Retry)
                     log.LogWarning("Yukleme basarisiz, {Wait:0.0} sn sonra yeniden denenecek.", wait.TotalSeconds);
             },

@@ -71,6 +71,11 @@ public sealed class Uploader
         var batch = _spool.PeekOldest();
         if (batch is null) return UploadOutcome.Idle;
 
+        // Token yoksa/okunamiyorsa bos "Bearer" ile istek GONDERME: sunucuya gereksiz yuk ve yaniltici 401 olur.
+        // Neden TokenProvider tarafindan loglanir; runner AuthFailed'da bekleyip yeniden dener (token gelince devam).
+        var token = _token();
+        if (string.IsNullOrWhiteSpace(token)) return UploadOutcome.AuthFailed;
+
         if (batch.Epoch != _lastBatchEpoch || batch.Seq != _lastBatchSeq)
         {
             _lastBatchEpoch = batch.Epoch;
@@ -79,7 +84,7 @@ public sealed class Uploader
         }
 
         using var req = new HttpRequestMessage(HttpMethod.Post, _ingestUrl) { Content = BuildContent(batch) };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token());
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         HttpResponseMessage resp;
         try
