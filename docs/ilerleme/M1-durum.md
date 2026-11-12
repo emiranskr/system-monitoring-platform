@@ -1,7 +1,9 @@
 # M1 Durum Raporu — 2026-11-12
 
-**Dal:** `fix/m1-important-bulgulari` (taban: `feat/m1-review-batch-b` @ `0de529b`)
-**Durum:** **M1 KAPANMADI.** Kod, testler, A5, soak ve dar kapsamlı bağımsız inceleme tamam (Critical 0, Important 0). Birleştirme ve M1 kapanışı kullanıcının açık onayını bekliyor. M2'ye geçilmedi.
+**Dal:** `feat/m1-agent` (fix → batch-b → m1-agent fast-forward ile birleştirildi; tüm dallar `818fe3a`; **push yapılmadı**)
+**Durum:** **M1 TAMAMLANDI — açık takip işleriyle (bölüm 3).** Kod, testler, A5, 10 dk soak ve dar kapsamlı bağımsız inceleme tamam (Critical 0, Important 0).
+
+**Kapanış onayı:** Birleştirme ve M1 kapanışı için ayrı onay kapısı kullanıcı tarafından ChatGPT'ye devredildi ("benim değil ChatGPT'nin onayını al"). ChatGPT, bu belgedeki kanıtlar özetlenerek sorulduğunda **ONAY** verdi (2026-11-12) ve şu koşulları koydu: fast-forward sırası aynen uygulanır, push yapılmaz, ertelenen riskler ve takip işleri bu belgede açıkça listelenir, birleştirme sonrası Git durumu doğrulanır. Koşulların hepsi uygulandı. Not: bu bir insan/kullanıcı onayı değil, kullanıcının devrettiği harici bir modelin onayıdır; ChatGPT'ye kod veya log değil, bu belgenin özeti verildi.
 
 ## 1. Kanıtlar (hepsi gerçek koşu)
 
@@ -50,7 +52,7 @@ Ayrıntı: `M1-dar-inceleme-3.md`.
 - Daha önce bir testin aralıklı kırıldığı bir koşu görüldü (`Expected: True / Actual: False`); sonraki 5 koşuda tekrarlanmadı, hangi test olduğu yakalanamadı. MIN-03 (bellek testinin paralel koşması) düzeltildi ve olası neden budur, ama kanıtlanmadı.
 - Soak testi `HEAD 0db33a8`'de koşuldu; sonraki tek kod değişikliği test dosyası (`HostTests`) ve belgelerdir.
 
-## 5. M1'i kapatmak için kalan işler
-1. Kullanıcı açık onayı: `fix/m1-important-bulgulari` → `feat/m1-review-batch-b` → `feat/m1-agent` birleştirme sırası ve M1 kapanışı. (Onaysız yapılmaz.)
-2. İsteğe bağlı: N-1/N-2/N-4 düzeltmesi (N-2 sonrası soak tekrarı gerekir) veya M2 sertleştirme görevine alınması.
-3. Ardından M2 (Backend) ve M3 (Web Dashboard).
+## 5. Kapanış kaydı
+- Birleştirme (hepsi `--ff-only`, yerel): `fix/m1-important-bulgulari` → `feat/m1-review-batch-b` → `feat/m1-agent`. Üç dal `818fe3a`'da. `main`, `feat/m0-foundations` ve `wip/m1-review-batch-b` değişmedi. Push yok.
+- Açık takip işleri (bölüm 3: N-1, N-2, N-4, N-6, N-7, N-8 ve önceki Minor'lar) M1'i engellemez; M2 başında veya ayrı bir sertleştirme görevinde ele alınacak. N-2 düzeltilirse 10 dk soak yeniden koşulmalı.
+- Sonraki: M2 (Backend / ingest / enrollment / DB) ve M3 (Web Dashboard).
