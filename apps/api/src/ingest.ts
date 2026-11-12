@@ -145,8 +145,12 @@ async function commit(
     }
     if (rows.ts.length > 0) {
       await c.query(
+        // NOT EXISTS ON eleme ZORUNLUDUR (olculdu, TimescaleDB 2.17.2): SIKISTIRILMIS bir chunk'ta bir gercek yinelenen iceren tek
+        // "INSERT ... ON CONFLICT DO NOTHING" ifadesi, ayni ifadedeki YENI satirlari da SESSIZCE YAZMAZ (0 satir, hata yok, 200+ack).
+        // Yinelenenler once elenince yeni satirlar yazilir; ON CONFLICT yalnizca yarislara karsi emniyet olarak kalir.
         `INSERT INTO metric_samples (ts, org_id, device_id, metric, value)
          SELECT u.t, $1::uuid, $2::uuid, u.m, u.v FROM unnest($3::timestamptz[], $4::text[], $5::float8[]) AS u(t, m, v)
+          WHERE NOT EXISTS (SELECT 1 FROM metric_samples e WHERE e.device_id = $2::uuid AND e.metric = u.m AND e.ts = u.t)
          ON CONFLICT (device_id, metric, ts) DO NOTHING`,
         [d.orgId, d.deviceId, rows.ts, rows.metric, rows.value],
       );

@@ -26,7 +26,7 @@ export interface TestDb {
  * GERCEK Docker TimescaleDB uzerinde her cagri icin gecici bir veritabani olusturur ve migrate eder (sahte DB yok).
  * Mevcut gelistirme verisine dokunmaz; drop() gecici veritabanini siler.
  */
-export async function createTestDb(): Promise<TestDb> {
+export async function createTestDb(opts: { migrate?: boolean } = {}): Promise<TestDb> {
   const base = new URL(devDatabaseUrl());
   const name = `sysmon_t_${randomBytes(6).toString("hex")}`;
   const admin = new pg.Client({ connectionString: base.toString() });
@@ -38,7 +38,7 @@ export async function createTestDb(): Promise<TestDb> {
   url.pathname = `/${name}`;
   const pool = new pg.Pool({ connectionString: url.toString(), max: 10 });
   pool.on("error", () => undefined); // test duzeni: bosta baglanti kopmasi (ornegin DROP DATABASE WITH FORCE) sureci dusurmesin
-  await migrate(pool);
+  if (opts.migrate !== false) await migrate(pool);
 
   return {
     pool,
