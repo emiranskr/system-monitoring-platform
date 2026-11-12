@@ -35,7 +35,9 @@ public class RunnerTests
             await Task.Delay(Timeout.Infinite, ct);
             return new Dictionary<string, double?>();
         });
-        var runner = new CollectorRunner([hang, Ok("mem", "mem.used_pct", 40)], TimeSpan.FromMilliseconds(100));
+        // Zaman asimi HER collector icin gecerlidir (hizli "mem" dahil): 100 ms, is parcacigi havuzu aciken hizli collector'i
+        // da zaman asimina ugratip testi aralikli kiriyordu. 1 sn: takilan collector yine zaman asimina ugrar, hizlisi ugramaz.
+        var runner = new CollectorRunner([hang, Ok("mem", "mem.used_pct", 40)], TimeSpan.FromMilliseconds(1000));
 
         var r = await runner.RunOnceAsync(CancellationToken.None);
 

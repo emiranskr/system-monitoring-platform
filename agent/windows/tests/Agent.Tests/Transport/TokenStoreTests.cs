@@ -103,14 +103,16 @@ public sealed class TokenStoreTests : IDisposable
         var stop = false;
         var failures = 0;
         var reads = 0;
-        var reader = Task.Run(() =>
+        // LongRunning: okuyucu ozel is parcacigi alir; is parcacigi havuzu aciken (diger testler bloke ederken) okuyucu
+        // yazici bitene kadar hic baslamaz ve "okuma sayisi dusuk" yanlis alarmi verirdi (hata TokenStore'da degil testteydi).
+        var reader = Task.Factory.StartNew(() =>
         {
             while (!Volatile.Read(ref stop))
             {
                 if (!s.TryLoad(out var t) || t is null || !t.EndsWith(Token)) Interlocked.Increment(ref failures);
                 Interlocked.Increment(ref reads);
             }
-        });
+        }, TaskCreationOptions.LongRunning);
         for (var i = 1; i <= 150; i++) s.Save($"t{i}-{Token}");
         Volatile.Write(ref stop, true);
         await reader;

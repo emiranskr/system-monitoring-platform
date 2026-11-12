@@ -100,12 +100,14 @@ public class PipelineRobustnessTests
     private sealed class Hanging : ICollector
     {
         public int Started;
+        /// <summary>Test serbest birakana kadar bloklar (zamana bagimli Thread.Sleep yerine: havuz aciken de deterministik).</summary>
+        public readonly ManualResetEventSlim Release = new(false);
         public string Name => "hang";
         public TimeSpan Interval => TimeSpan.FromSeconds(1);
         public Task<IReadOnlyDictionary<string, double?>> CollectAsync(CancellationToken ct)
         {
             Interlocked.Increment(ref Started);
-            Thread.Sleep(600); // iptali yok sayan, bloklayan cagri
+            Release.Wait(); // iptali yok sayan, bloklayan cagri
             return Task.FromResult<IReadOnlyDictionary<string, double?>>(new Dictionary<string, double?>());
         }
     }
@@ -118,11 +120,12 @@ public class PipelineRobustnessTests
         var statuses = new List<CollectorStatus>();
         for (var i = 0; i < 5; i++) statuses.AddRange((await runner.RunOnceAsync(CancellationToken.None)).Statuses);
 
-        Assert.Equal(1, h.Started); // 5 tur boyunca yalnizca 1 cagri baslatildi
+        Assert.Equal(1, h.Started); // 5 tur boyunca yalnizca 1 cagri baslatildi (takili cagri serbest birakilmadi)
         Assert.All(statuses, s => Assert.False(s.Ok));
         Assert.Contains(statuses, s => s.Message!.Contains("hala calisiyor"));
-        await Task.Delay(800); // takili cagri bitince yeniden baslatilabilir
-        await runner.RunOnceAsync(CancellationToken.None);
+
+        h.Release.Set(); // takili cagri bitince yeniden baslatilabilir
+        await TestUtil.WaitUntil(() => { runner.RunOnceAsync(CancellationToken.None).GetAwaiter().GetResult(); return Volatile.Read(ref h.Started) >= 2; });
         Assert.Equal(2, h.Started);
     }
 
