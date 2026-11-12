@@ -47,8 +47,8 @@ public sealed class SystemNetworkSource : INetworkSource
 {
     public IReadOnlyList<NicCounters> Read() =>
         NetworkInterface.GetAllNetworkInterfaces()
-            .Where(n => n.OperationalStatus == OperationalStatus.Up
-                        && n.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel))
+            .Where(n => NicFilter.IsMonitored(new NicInfo(n.Name, n.Description, n.NetworkInterfaceType, n.OperationalStatus,
+                n.GetIPProperties().UnicastAddresses.Select(u => u.Address).ToList())))
             .Select(n =>
             {
                 var s = n.GetIPStatistics();
