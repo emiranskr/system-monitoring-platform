@@ -7,7 +7,9 @@ import { join, dirname } from "node:path";
 import { createTestDb } from "../../packages/db/dist/testing.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const nDev = Number(process.argv[2] ?? 5), hours = Number(process.argv[3] ?? 6);
+const nDev = Number(process.argv[2] ?? 5), hours = Number(process.argv[3] ?? 6), intervalSec = Number(process.argv[4] ?? 1);
+const isDefault = nDev === 5 && hours === 6 && intervalSec === 1; // varsayilan kosu mevcut kanit dosyasinin uzerine yazar, digerleri ayri dosya
+
 const db = await createTestDb();
 const q = (s, p) => db.pool.query(s, p);
 try {
@@ -31,10 +33,10 @@ try {
          WHEN 'burst' THEN CASE WHEN random() < 0.1 THEN floor(random()*5000000) ELSE floor(random()*2000) END
          ELSE 8000000000 + floor(extract(epoch from t)/30)*4096 + floor(random()*65536)
        END
-     FROM generate_series(now() - $1::int * interval '1 hour' - interval '30 hours', now() - interval '30 hours', interval '1 second') t
+     FROM generate_series(now() - $1::int * interval '1 hour' - interval '30 hours', now() - interval '30 hours', make_interval(secs => $2::int)) t
      CROSS JOIN (SELECT id, org_id, row_number() OVER () AS row_number_n FROM devices) d
      CROSS JOIN mm`,
-    [hours],
+    [hours, intervalSec],
   );
   const insertSec = (Date.now() - t0) / 1000;
   const rows = Number((await q("SELECT count(*) FROM metric_samples")).rows[0].count);
@@ -80,7 +82,7 @@ try {
   };
   console.log(JSON.stringify(out, null, 2));
   mkdirSync(join(root, "docs/ilerleme/kanit"), { recursive: true });
-  writeFileSync(join(root, "docs/ilerleme/kanit/m2-depolama-olcumu.json"), JSON.stringify(out, null, 2));
+  writeFileSync(join(root, `docs/ilerleme/kanit/m2-depolama-olcumu${isDefault ? "" : `-${nDev}cihaz-${hours}sa-${intervalSec}sn`}.json`), JSON.stringify(out, null, 2));
 } finally {
   await db.drop();
 }

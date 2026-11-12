@@ -62,7 +62,7 @@ try {
   };
   console.log(JSON.stringify(out, null, 2));
   mkdirSync(join(root, "docs/ilerleme/kanit"), { recursive: true });
-  writeFileSync(join(root, "docs/ilerleme/kanit/m2-gercek-veri-siksitirma.json"), JSON.stringify(out, null, 2));
+  writeFileSync(join(root, `docs/ilerleme/kanit/m2-gercek-veri-siksitirma${durSec === 600 ? "" : "-" + durSec + "s"}.json`), JSON.stringify(out, null, 2));
 } finally {
   try { agent?.kill(); } catch { /* yok */ }
   await sleep(500);

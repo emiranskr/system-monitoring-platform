@@ -1,0 +1,89 @@
+{
+  "not": "SENTETIK ama karisik dagilim; gercek makine verisiyle siksitirma orani farkli olabilir. Projeksiyon dogrusal.",
+  "olcum": {
+    "cihaz": 8,
+    "saat": 48,
+    "satir": 7529280,
+    "ekleme_sn": 158,
+    "bayt_satir_siksitirmasiz": 209.6,
+    "bayt_satir_siksitirilmis": 4.4,
+    "siksitirma_orani": 47.5,
+    "agrega_satir": 627360,
+    "agrega_bayt_satir": 160.5,
+    "agrega_siksitirilmis_bayt_satir": 15.2
+  },
+  "projeksiyon": [
+    {
+      "cihaz": 500,
+      "ornek_araligi_sn": 1,
+      "siksitirmasiz_pencere_gun": 2,
+      "agrega_siksitirilmis": false,
+      "satir_gun_milyon": 1296,
+      "ham_siksitirmasiz_GB_gun": 252.9,
+      "ham_siksitirilmis_GB_gun": 5.3,
+      "agrega_1dk_GB_gun": 3.23,
+      "kalici_toplam_GB": 608
+    },
+    {
+      "cihaz": 500,
+      "ornek_araligi_sn": 5,
+      "siksitirmasiz_pencere_gun": 2,
+      "agrega_siksitirilmis": false,
+      "satir_gun_milyon": 259,
+      "ham_siksitirmasiz_GB_gun": 50.6,
+      "ham_siksitirilmis_GB_gun": 1.1,
+      "agrega_1dk_GB_gun": 3.23,
+      "kalici_toplam_GB": 199
+    },
+    {
+      "cihaz": 500,
+      "ornek_araligi_sn": 5,
+      "siksitirmasiz_pencere_gun": 0.5,
+      "agrega_siksitirilmis": true,
+      "satir_gun_milyon": 259,
+      "ham_siksitirmasiz_GB_gun": 50.6,
+      "ham_siksitirilmis_GB_gun": 1.1,
+      "agrega_1dk_GB_gun": 0.31,
+      "kalici_toplam_GB": 37
+    },
+    {
+      "cihaz": 500,
+      "ornek_araligi_sn": 5,
+      "siksitirmasiz_pencere_gun": 2,
+      "agrega_siksitirilmis": true,
+      "satir_gun_milyon": 259,
+      "ham_siksitirmasiz_GB_gun": 50.6,
+      "ham_siksitirilmis_GB_gun": 1.1,
+      "agrega_1dk_GB_gun": 0.31,
+      "kalici_toplam_GB": 111
+    },
+    {
+      "cihaz": 500,
+      "ornek_araligi_sn": 10,
+      "siksitirmasiz_pencere_gun": 0.5,
+      "agrega_siksitirilmis": true,
+      "satir_gun_milyon": 130,
+      "ham_siksitirmasiz_GB_gun": 25.3,
+      "ham_siksitirilmis_GB_gun": 0.5,
+      "agrega_1dk_GB_gun": 0.31,
+      "kalici_toplam_GB": 23
+    },
+    {
+      "cihaz": 500,
+      "ornek_araligi_sn": 15,
+      "siksitirmasiz_pencere_gun": 2,
+      "agrega_siksitirilmis": false,
+      "satir_gun_milyon": 86,
+      "ham_siksitirmasiz_GB_gun": 16.9,
+      "ham_siksitirilmis_GB_gun": 0.4,
+      "agrega_1dk_GB_gun": 3.23,
+      "kalici_toplam_GB": 131
+    }
+  ],
+  "butce": {
+    "B-3a_siksitirmasiz_GB_gun": 15,
+    "B-3b_siksitirilmis_GB_gun": 5,
+    "B-4_agrega_GB_gun": 2,
+    "B-5_toplam_GB": 150
+  }
+}
