@@ -15,7 +15,7 @@ export interface AppOptions {
   now?: () => Date;
   /** Ters proxy arkasinda istemci IP'si icin; varsayilan KAPALI (X-Forwarded-For'a guvenilmez). */
   trustProxy?: boolean | string;
-  logger?: boolean;
+  logger?: boolean | { level: string };
 }
 
 export function buildApp(opts: AppOptions): FastifyInstance {
@@ -23,7 +23,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   const now = opts.now ?? (() => new Date());
   const app = Fastify({
     logger: opts.logger
-      ? { redact: ["req.headers.authorization", "req.headers.cookie"], level: "info" }
+      ? { redact: ["req.headers.authorization", "req.headers.cookie"], level: typeof opts.logger === "object" ? opts.logger.level : "info" }
       : false,
     trustProxy: opts.trustProxy ?? false,
     bodyLimit: MAX_COMPRESSED_BYTES,

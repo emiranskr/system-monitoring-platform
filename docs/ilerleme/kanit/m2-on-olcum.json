@@ -1,0 +1,112 @@
+{
+  "not": "ON OLCUM: yuk uretici+API+DB ayni makinede; resmi B6 degil",
+  "tarih": "2026-11-12T17:40:57.381Z",
+  "adim_sure_sn": 45,
+  "sonuclar": [
+    {
+      "cihaz": 10,
+      "sure_sn": 48,
+      "istek": 91,
+      "basarili_200": 91,
+      "durumlar": {
+        "200": 91
+      },
+      "istek_sn": 1.9,
+      "satir_sn": 286,
+      "satir": 13650,
+      "p50_ms": 13.2,
+      "p95_ms": 16.8,
+      "p99_ms": 60.9,
+      "maks_ms": 60.9,
+      "api_cpu_tek_cekirdek_yuzde": 0,
+      "api_rss_mb": 78,
+      "db_konteyner_orta": "0.02% | 140.9MiB / 11.24GiB",
+      "tablo_boyut_mb": 2.6,
+      "bayt_satir": 200
+    },
+    {
+      "cihaz": 50,
+      "sure_sn": 48,
+      "istek": 461,
+      "basarili_200": 461,
+      "durumlar": {
+        "200": 461
+      },
+      "istek_sn": 9.7,
+      "satir_sn": 1450,
+      "satir": 69150,
+      "p50_ms": 10.7,
+      "p95_ms": 16.1,
+      "p99_ms": 26.4,
+      "maks_ms": 31.2,
+      "api_cpu_tek_cekirdek_yuzde": 1,
+      "api_rss_mb": 92,
+      "db_konteyner_orta": "0.01% | 153.8MiB / 11.24GiB",
+      "tablo_boyut_mb": 12.4,
+      "bayt_satir": 188
+    },
+    {
+      "cihaz": 100,
+      "sure_sn": 48,
+      "istek": 928,
+      "basarili_200": 928,
+      "durumlar": {
+        "200": 928
+      },
+      "istek_sn": 19.5,
+      "satir_sn": 2920,
+      "satir": 139200,
+      "p50_ms": 13,
+      "p95_ms": 53.3,
+      "p99_ms": 71.5,
+      "maks_ms": 79,
+      "api_cpu_tek_cekirdek_yuzde": 2,
+      "api_rss_mb": 119,
+      "db_konteyner_orta": "0.02% | 166.8MiB / 11.24GiB",
+      "tablo_boyut_mb": 24.8,
+      "bayt_satir": 187
+    },
+    {
+      "cihaz": 250,
+      "sure_sn": 48,
+      "istek": 2300,
+      "basarili_200": 2300,
+      "durumlar": {
+        "200": 2300
+      },
+      "istek_sn": 48.3,
+      "satir_sn": 7238,
+      "satir": 345000,
+      "p50_ms": 13.7,
+      "p95_ms": 152.7,
+      "p99_ms": 596.4,
+      "maks_ms": 673.4,
+      "api_cpu_tek_cekirdek_yuzde": 4,
+      "api_rss_mb": 136,
+      "db_konteyner_orta": "5.80% | 196.2MiB / 11.24GiB",
+      "tablo_boyut_mb": 60.9,
+      "bayt_satir": 185
+    },
+    {
+      "cihaz": 500,
+      "sure_sn": 48,
+      "istek": 4632,
+      "basarili_200": 4632,
+      "durumlar": {
+        "200": 4632
+      },
+      "istek_sn": 97.2,
+      "satir_sn": 14578,
+      "satir": 694800,
+      "p50_ms": 14.5,
+      "p95_ms": 144.7,
+      "p99_ms": 197.1,
+      "maks_ms": 254.2,
+      "api_cpu_tek_cekirdek_yuzde": 6,
+      "api_rss_mb": 136,
+      "db_konteyner_orta": "0.02% | 246MiB / 11.24GiB",
+      "tablo_boyut_mb": 122.7,
+      "bayt_satir": 185
+    }
+  ]
+}
