@@ -97,10 +97,21 @@ describe("saklama ve sikistirma politikalari (D7)", () => {
       "SELECT materialization_hypertable_name AS n FROM timescaledb_information.continuous_aggregates WHERE view_name='metric_1m'",
     )).rows[0].n as string;
     const by = (p: string, h: string) => r.rows.find((x) => x.proc_name === p && x.hypertable_name === h)?.config;
-    expect(by("policy_compression", "metric_samples")?.compress_after).toBe("2 days");
+    // 0003 (M2 depolama olcumu): ham veri 12 saat sonra sikistirilir (siksitirmasiz pencere kisa), 1 dk agrega 3 gun sonra.
+    expect(by("policy_compression", "metric_samples")?.compress_after).toBe("12:00:00");
     expect(by("policy_retention", "metric_samples")?.drop_after).toBe("3 days");
     expect(by("policy_retention", mat)?.drop_after).toBe("30 days");
     expect(by("policy_refresh_continuous_aggregate", mat)?.start_offset).toBe("2 days");
+    expect(by("policy_compression", mat)?.compress_after).toBe("3 days"); // agrega yenileme penceresinden (2 gun) SONRA
+  });
+
+  it("chunk araligi 6 saat (kisa sikistirma penceresi icin), agrega sikistirma acik", async () => {
+    const dim = (await db.pool.query(
+      "SELECT time_interval FROM timescaledb_information.dimensions WHERE hypertable_name='metric_samples'")).rows[0];
+    expect(dim.time_interval).toEqual({ hours: 6 });
+    const cagg = (await db.pool.query(
+      "SELECT compression_enabled FROM timescaledb_information.continuous_aggregates WHERE view_name='metric_1m'")).rows[0];
+    expect(cagg.compression_enabled).toBe(true);
   });
 
   it("B0 spike: sikistirilmis chunk'a (a) yinelenen ve (b) YENI satir eklenebilir", async () => {
