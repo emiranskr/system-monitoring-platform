@@ -54,13 +54,31 @@ public sealed class UploadRobustnessTests : IAsyncDisposable
         await _srv.StartAsync();
         var spool = NewSpool();
         spool.Enqueue(One(1));
+        // GERCEK yonlendirme: Location ikinci sunucuyu gosterir ve istemci HER IKI sertifikayi da pinler; yani yonlendirme
+        // takip EDILSEYDI istek ikinci sunucuya ulasir ve basarili olurdu (AllowAutoRedirect=true mutasyonunda bu test kirilir).
         _srv.Respond = _ => (307, "{}");
-        // Yonlendirme basligi test sunucusunda yok; yine de 3xx'i hata sayip izlememeli.
-        var outcome = await NewUploader(spool).UploadOnceAsync(default);
+        _srv.RedirectLocation = new Uri(other.Url, "agent/v1/ingest").ToString();
+        var up = new Uploader(spool, HttpClients.Create([SpkiPin.Compute(_srv.Cert), SpkiPin.Compute(other.Cert)]), _srv.Url,
+            () => "t", AgentOptions.Parse([]), () => _now);
+
+        var outcome = await up.UploadOnceAsync(default);
 
         Assert.Equal(UploadOutcome.Retry, outcome);
         Assert.Equal(1, spool.PendingCount);
-        Assert.Empty(other.Bodies);
+        Assert.Empty(other.Bodies);        // ikinci hosta veri gitmedi
+        Assert.Empty(other.AuthHeaders);   // ve token da gitmedi
+    }
+
+    [Fact]
+    public async Task Ack_seq_gonderilen_seqten_kucukse_batch_silinmez_Release_dahil()
+    {
+        await _srv.StartAsync();
+        var spool = NewSpool();
+        spool.Enqueue(One(1)); // seq 0
+        _srv.Respond = _ => (200, "{\"ack_seq\":-1,\"rejected\":0}");
+
+        Assert.Equal(UploadOutcome.Retry, await NewUploader(spool).UploadOnceAsync(default));
+        Assert.Equal(1, spool.PendingCount);
     }
 
     [Fact]

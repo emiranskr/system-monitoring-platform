@@ -22,6 +22,9 @@ public sealed class TestHttpsServer : IAsyncDisposable
     public ConcurrentQueue<string?> AuthHeaders { get; } = new();
     public Func<JsonElement, (int Status, string Json)>? Respond { get; set; }
 
+    /// <summary>Doluysa her yanita bu "Location" basligi eklenir (yonlendirme testleri icin).</summary>
+    public string? RedirectLocation { get; set; }
+
     private WebApplication? _app;
 
     public TestHttpsServer()
@@ -68,6 +71,7 @@ public sealed class TestHttpsServer : IAsyncDisposable
                     server_time = DateTimeOffset.UtcNow.ToString("O"),
                 }));
             ctx.Response.StatusCode = status;
+            if (RedirectLocation is not null) ctx.Response.Headers.Location = RedirectLocation;
             ctx.Response.ContentType = "application/json";
             await ctx.Response.WriteAsync(json);
         });
