@@ -6,3 +6,5 @@ obj/
 *.log
 .env
 coverage/
+
+TestResults/

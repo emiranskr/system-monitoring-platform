@@ -115,11 +115,7 @@ public sealed partial class Spool : IBatchSink
             // Yazma sonrasi cokersek state.json geride kalir; acilista NextSeq segmentlerden uzlastirilir.
             var line = JsonSerializer.Serialize(batch, Json) + "\n";
             var bytes = Encoding.UTF8.GetBytes(line);
-            using (var fs = new FileStream(seg.Path, FileMode.Append, FileAccess.Write, FileShare.Read))
-            {
-                fs.Write(bytes);
-                fs.Flush(true);
-            }
+            AppendDurably(seg, bytes);
             seg.Bytes += bytes.Length;
             seg.Refs.Add(new BatchRef(batch.Epoch, batch.Seq, batch.CreatedAt));
             if (_headCache?.SegmentIndex == seg.Index) _headCache = null;
@@ -133,7 +129,29 @@ public sealed partial class Spool : IBatchSink
         }
     }
 
-    /// <summary>Gonderilecek en eski batch (icerigi diskten okunur). Diskte bulunamayan indeks girdileri atlanir.</summary>
+    /// <summary>
+    /// Satiri segmentin SON GECERLI sinirina (seg.Bytes) ekler ve fsync eder. Onceki basarisiz bir yazmadan kalan
+    /// '\n'siz kalinti varsa once kirpilir (I-2): aksi halde yeni satir kalintiya yapisip gecersiz JSON olur ve batch kaybolur.
+    /// Yazma hatasinda dosya yine son gecerli boyuta geri kirpilir (en iyi caba) ve istisna yeniden firlatilir.
+    /// </summary>
+    private static void AppendDurably(Segment seg, byte[] bytes)
+    {
+        using var fs = new FileStream(seg.Path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
+        try
+        {
+            if (fs.Length != seg.Bytes) fs.SetLength(seg.Bytes);
+            fs.Seek(seg.Bytes, SeekOrigin.Begin);
+            fs.Write(bytes);
+            fs.Flush(true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            try { fs.SetLength(seg.Bytes); } catch (Exception) { /* sonraki Enqueue ayni kirpmayi yeniden dener */ }
+            throw;
+        }
+    }
+
+    /// <summary>Gonderilecek en eski batch (icerigi diskten okunur). Diskte bulunamayan indeks girdileri atlanir, SAYILIR ve bildirilir.</summary>
     public Batch? PeekOldest()
     {
         lock (_gate)
@@ -151,6 +169,9 @@ public sealed partial class Spool : IBatchSink
                 // Indeks var ama veri okunamiyor (silinmis/bozuk): bu girdiyi dusur ve siradakine gec.
                 seg.Refs.RemoveAt(0);
                 _headCache = null;
+                DroppedBatches++;
+                try { _onDropped?.Invoke(1); }
+                catch (Exception) { /* bildirim hatasi spool'u etkilemez */ }
                 if (seg.Refs.Count == 0) DeleteSegment(seg);
             }
         }
