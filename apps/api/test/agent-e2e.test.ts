@@ -26,7 +26,7 @@ describe.skipIf(!enabled)("agent <-> API uca-uca (gercek surec)", () => {
   let org = "", device = "", port = 0;
 
   const startApi = async () => {
-    app = buildApp({ pool: db.pool });
+    app = buildApp({ pool: db.pool, credentialKey: Buffer.alloc(32, 1) });
     app.addHook("onResponse", async (req, reply) => {
       statuses.push(reply.statusCode);
       seenAuth.add(String(req.headers.authorization ?? "").slice(0, 7));
@@ -56,7 +56,7 @@ describe.skipIf(!enabled)("agent <-> API uca-uca (gercek surec)", () => {
     if (imp.status !== 0) throw new Error(`token import basarisiz: ${imp.stdout}${imp.stderr}`);
 
     // bos bir port bul
-    const tmp = buildApp({ pool: db.pool });
+    const tmp = buildApp({ pool: db.pool, credentialKey: Buffer.alloc(32, 1) });
     await tmp.listen({ port: 0, host: "127.0.0.1" });
     port = (tmp.server.address() as { port: number }).port;
     await tmp.close();

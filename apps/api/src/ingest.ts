@@ -4,7 +4,8 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type pg from "pg";
 import { z } from "zod";
 import { MAX_SAMPLES_PER_BATCH, METRIC_NAME_RE, MetricValueSchema } from "@sysmon/protocol";
-import { hashToken, parseBearer } from "./tokens.js";
+import { authenticate, type AuthedDevice } from "./auth.js";
+import { HttpError } from "./errors.js";
 
 const gunzipAsync = promisify(gunzip);
 
@@ -37,44 +38,21 @@ const Envelope = z.strictObject({
 
 export interface Device { orgId: string; deviceId: string }
 declare module "fastify" {
-  interface FastifyRequest { device?: Device }
+  interface FastifyRequest { auth?: AuthedDevice }
 }
 
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
-/** Tek tip hata govdesi: ayrinti (neden reddedildigi) disariya sizdirilmaz. */
-class HttpError extends Error {
-  constructor(public status: number, public code: string, public extra: Record<string, unknown> = {}) {
-    super(code);
-  }
-}
-
 export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => Date): void {
-  // Govde ham tampon olarak alinir (sikistirilmis <= 1 MB, asimda Fastify 413 verir); gzip burada, sinirli acilir.
-  app.addContentTypeParser("application/json", { parseAs: "buffer", bodyLimit: MAX_COMPRESSED_BYTES }, (_req, body, done) => {
-    done(null, body);
-  });
-
   app.route({
     method: "POST",
     url: "/agent/v1/ingest",
     // Kimlik dogrulama govde okunmadan ONCE: yetkisiz istek icin govde islenmez.
     onRequest: async (req: FastifyRequest) => {
-      const token = parseBearer(req.headers.authorization);
-      if (!token) throw new HttpError(401, "unauthorized");
-      const r = await pool.query<{ org_id: string; device_id: string }>(
-        `SELECT t.org_id, t.device_id
-           FROM device_tokens t JOIN devices d ON d.id = t.device_id
-          WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > now())
-            AND d.revoked_at IS NULL`,
-        [hashToken(token)],
-      );
-      const row = r.rows[0];
-      if (!row) throw new HttpError(401, "unauthorized");
-      req.device = { orgId: row.org_id, deviceId: row.device_id };
+      req.auth = await authenticate(pool, req.headers.authorization, now());
     },
     handler: async (req, reply) => {
-      const device = req.device!;
+      const device: Device = { orgId: req.auth!.orgId, deviceId: req.auth!.deviceId };
       const raw = await decodeBody(req);
       let json: unknown;
       try {
@@ -117,15 +95,6 @@ export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => D
     },
   });
 
-  app.setErrorHandler((err: Error & { statusCode?: number; code?: string }, _req, reply) => {
-    if (err instanceof HttpError) return reply.status(err.status).send({ error: err.code, ...err.extra });
-    // Fastify'in kendi hatalari (govde cok buyuk 413, desteklenmeyen ortam 415, gecersiz govde 400)
-    if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
-      return reply.status(err.statusCode).send({ error: err.statusCode === 413 ? "payload_too_large" : err.statusCode === 415 ? "unsupported_media_type" : "bad_request" });
-    }
-    app.log.error({ err: { message: err.message, code: err.code } }, "ingest hatasi"); // govde/baslik loglanmaz
-    return reply.status(500).send({ error: "internal" });
-  });
 }
 
 /** gzip'i sinirli acar: > 10 MB -> 413, bozuk gzip -> 400, bilinmeyen kodlama -> 415. */

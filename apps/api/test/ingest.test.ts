@@ -23,7 +23,7 @@ async function mkDevice(name: string): Promise<Dev> {
 
 beforeAll(async () => {
   db = await createTestDb();
-  app = buildApp({ pool: db.pool, now: () => now });
+  app = buildApp({ pool: db.pool, now: () => now, credentialKey: Buffer.alloc(32, 1) });
   await app.ready();
   A = await mkDevice("orgA");
   B = await mkDevice("orgB");
@@ -91,7 +91,7 @@ describe("kimlik dogrulama", () => {
   });
   it("suresi dolan token 401", async () => {
     const d = await mkDevice("exp");
-    await db.pool.query("UPDATE device_tokens SET expires_at=now()-interval '1 minute' WHERE device_id=$1", [d.id]);
+    await db.pool.query("UPDATE device_tokens SET expires_at=$2 WHERE device_id=$1", [d.id, new Date(now.getTime() - 60_000)]);
     expect((await post(body(), d.token)).statusCode).toBe(401);
   });
   it("iptal edilmis CIHAZIN gecerli token'i da 401", async () => {
