@@ -8,6 +8,7 @@ export default defineConfig({
     alias: {
       "@sysmon/db/testing": src("../../packages/db/src/testing.ts"),
       "@sysmon/db": src("../../packages/db/src/index.ts"),
+      "@sysmon/fake-agent": src("../../packages/fake-agent/src/index.ts"),
       "@sysmon/protocol": src("../../packages/protocol/src/index.ts"),
     },
   },
