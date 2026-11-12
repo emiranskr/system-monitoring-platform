@@ -56,6 +56,19 @@ public sealed class ProcessExitCodeTests : IDisposable
         Assert.False(string.IsNullOrWhiteSpace(output));
     }
 
+    [Theory]
+    [InlineData("http://127.0.0.1:9")]            // http: --allow-insecure-loopback olmadan HER derlemede reddedilir
+    [InlineData("http://ornek.com")]
+    [InlineData("ftp://ornek.com")]
+    public void Izin_verilmeyen_sunucu_adresi_surec_baslamadan_cikis_kodu_2_olur(string server)
+    {
+        var (code, output) = Run("--server", server, "--data-dir", _dataDir);
+
+        Assert.Equal(2, code); // sessiz "basarili durma" (0) degil: yanlis yapilandirma isletim tarafinda gorunur olmali
+        Assert.False(string.IsNullOrWhiteSpace(output));
+        Assert.False(Directory.Exists(Path.Combine(_dataDir, "spool"))); // host kurulmadi, veri dizini olusmadi
+    }
+
     [Fact]
     public void Ikinci_surec_cikinca_ilk_ornegin_kilidi_korunur()
     {

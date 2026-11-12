@@ -36,6 +36,14 @@ if (options.ImportToken is not null)
     }
 }
 
+// Hizli basarisizlik: izin verilmeyen sunucu adresi (ornegin Release'te http) ana bilgisayar kurulmadan reddedilir. Aksi halde
+// istisna Worker icinde kaybolur ve surec "basarili" (0) diye durur: yanlis yapilandirma SCM/operator icin gorunmez olurdu.
+if (options.Server is { } server && (!Uri.TryCreate(server, UriKind.Absolute, out var serverUri) || !ServerUrlPolicy.IsAllowed(serverUri, options)))
+{
+    Console.Error.WriteLine("--server adresine izin verilmiyor: https gerekir (http yalnizca Debug derlemesinde, loopback ve --allow-insecure-loopback ile).");
+    return 2;
+}
+
 using var host = AgentHost.Build(options, []);
 await host.RunAsync();
 // Worker (ornegin InstanceLock alinamadi) Environment.ExitCode'u ayarlar; int donusu bunu ezmemeli.
