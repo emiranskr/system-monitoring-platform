@@ -95,12 +95,45 @@ try {
     results.push(r);
     console.log(JSON.stringify(r));
   }
+
+  // Toplu yeniden baglanma firtinasi (B-?): kesinti sonrasi TUM cihazlar biriken batch'lerini AYNI ANDA bosaltir (her cihaz stop-and-wait).
+  if (process.argv[5] === "storm") {
+    const nStorm = steps.at(-1), backlog = 12;
+    await ensure(nStorm);
+    await db.pool.query("TRUNCATE metric_samples");
+    const sl = [], sst = new Map();
+    const t0 = Date.now();
+    await Promise.all(devices.slice(0, nStorm).map(async (d) => {
+      for (let b = 0; b < backlog; b++) {
+        const base = Date.now() - 600_000 + b * 5000;
+        const samples = Array.from({ length: 5 }, (_, i) => ({ ts: iso(new Date(base + i * 1000)), m: Object.fromEntries(METRICS.map((m, j) => [m, (j * 7 + i) % 100])) }));
+        const body = gzipSync(Buffer.from(JSON.stringify({ v: 1, spool_epoch: d.epoch, seq: d.seq++, sent_at: iso(new Date()), samples })));
+        const s = performance.now();
+        try {
+          const r = await fetch(`http://127.0.0.1:${PORT}/agent/v1/ingest`, { method: "POST", body, headers: { "content-type": "application/json", "content-encoding": "gzip", authorization: `Bearer ${d.token}` } });
+          await r.arrayBuffer();
+          sl.push(performance.now() - s);
+          sst.set(r.status, (sst.get(r.status) ?? 0) + 1);
+        } catch { sst.set("hata", (sst.get("hata") ?? 0) + 1); }
+      }
+    }));
+    const secs = (Date.now() - t0) / 1000;
+    sl.sort((a, b) => a - b);
+    const rows = Number((await db.pool.query("SELECT count(*) FROM metric_samples")).rows[0].count);
+    const r = {
+      firtina: true, cihaz: nStorm, batch_cihaz: backlog, istek: nStorm * backlog, sure_sn: +secs.toFixed(1), istek_sn: +((nStorm * backlog) / secs).toFixed(0),
+      durumlar: Object.fromEntries(sst), p50_ms: +pct(sl, 50)?.toFixed(1), p95_ms: +pct(sl, 95)?.toFixed(1), p99_ms: +pct(sl, 99)?.toFixed(1), maks_ms: +sl.at(-1)?.toFixed(1),
+      satir: rows, beklenen_satir: nStorm * backlog * 150, api_rss_mb: rssOf(api.pid),
+    };
+    results.push(r);
+    console.log(JSON.stringify(r));
+  }
 } finally {
   api.kill();
   await sleep(500);
   await db.drop();
 }
 mkdirSync(join(root, "docs/ilerleme/kanit"), { recursive: true });
-const out = join(root, "docs/ilerleme/kanit/m2-on-olcum.json");
+const out = join(root, "docs/ilerleme/kanit", process.argv[4] ?? "m2-on-olcum.json");
 writeFileSync(out, JSON.stringify({ not: "ON OLCUM: yuk uretici+API+DB ayni makinede; resmi B6 degil", tarih: new Date().toISOString(), adim_sure_sn: durSec, sonuclar: results }, null, 2));
 console.log("yazildi:", out);
