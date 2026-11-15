@@ -8,7 +8,7 @@ import { createPool } from "./pool.js";
 /**
  * Yapilandirma ortam degiskenleriyle: DATABASE_URL (zorunlu), CREDENTIAL_KEY (zorunlu, 32 bayt base64: credential'larin
  * yeniden deneme penceresi boyunca sifreli tutulmasi), PORT (8443), HOST (127.0.0.1), SPKI_PINS (virgulle ayrilmis
- * sha256/<b64>), SAMPLE_INTERVAL_SECONDS (5; agent ornekleme araligi), LOG_LEVEL (info), TRUST_PROXY (kapali; ters proxy arkasinda guvenilen ATLAMA SAYISI, orn. 1, veya IP/CIDR listesi; "true" REDDEDILIR), MIGRATE ("1" = acilista migrate).
+ * sha256/<b64>), SAMPLE_INTERVAL_SECONDS (5; agent ornekleme araligi), LOG_LEVEL (info), TRUST_PROXY (kapali; ters proxy arkasinda guvenilen proxy IP/CIDR LISTESI, orn. 127.0.0.1,10.0.0.0/8; "true" ve sayisal atlama sayisi REDDEDILIR), MIGRATE ("1" = acilista migrate).
  * TLS_CERT + TLS_KEY (PEM dosya yollari) verilirse HTTPS dinler (TLS >= 1.2); verilmezse DUZ HTTP: Agent (Release) yalnizca
  * HTTPS kabul ettiginden uretimde TLS ya burada ya da onundeki ters proxy'de sonlandirilmalidir (TRUST_PROXY ile).
  */
