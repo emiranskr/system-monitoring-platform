@@ -4,6 +4,7 @@ import type pg from "pg";
 import { z } from "zod";
 import { connectGuarded, releaseGuarded } from "./db.js";
 import { HttpError, badRequest } from "./errors.js";
+import { jsonBody } from "./http-util.js";
 import { MIN_PASSWORD_LENGTH, hashPassword, verifyDummy, verifyPassword } from "./password.js";
 import { ipKey, rateLimited, type Limiters } from "./ratelimit.js";
 import { COOKIE_NAME, clearSessionCookie, parseCookies, setSessionCookie } from "./session-guard.js";
@@ -47,10 +48,6 @@ const invalidCredentials = () => new HttpError(401, "invalid_credentials");
 
 async function audit(pool: pg.Pool, now: Date, orgId: string | null, kind: string, detail: Record<string, unknown> = {}): Promise<void> {
   await pool.query("INSERT INTO audit_events (ts, org_id, kind, detail) VALUES ($1,$2,$3,$4)", [now, orgId, kind, JSON.stringify(detail)]);
-}
-
-function jsonBody(req: { body: unknown }): unknown {
-  try { return JSON.parse((req.body as Buffer).toString("utf8")); } catch { throw badRequest(); }
 }
 
 export function registerAuthRoutes(app: FastifyInstance, pool: pg.Pool, now: () => Date, cfg: SessionConfig, limiters: Limiters): void {

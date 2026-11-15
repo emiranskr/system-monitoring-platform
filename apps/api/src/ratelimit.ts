@@ -79,6 +79,8 @@ export interface Limits {
   loginPerIp?: number;
   /** IP basina ilk kurulum (setup) denemesi / pencere. */
   setupPerIp?: number;
+  /** Kullanici basina enrollment token uretimi / pencere. */
+  enrollTokenPerUser?: number;
   windowMs?: number;
 }
 
@@ -90,6 +92,7 @@ export interface Limiters {
   loginPerKey: RateLimiter;
   loginPerIp: RateLimiter;
   setupPerIp: RateLimiter;
+  enrollTokenPerUser: RateLimiter;
 }
 
 export function createLimiters(l: Limits | undefined, now: () => Date): Limiters {
@@ -104,6 +107,7 @@ export function createLimiters(l: Limits | undefined, now: () => Date): Limiters
     loginPerKey: new RateLimiter(l?.loginPerKey ?? 10, w, now),
     loginPerIp: new RateLimiter(l?.loginPerIp ?? 60, w, now),
     setupPerIp: new RateLimiter(l?.setupPerIp ?? 10, w, now),
+    enrollTokenPerUser: new RateLimiter(l?.enrollTokenPerUser ?? 10, w, now),
   };
 }
 

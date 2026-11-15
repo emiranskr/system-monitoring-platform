@@ -24,7 +24,7 @@ export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSecond
   const app = buildApp({ pool: db.pool, now: () => clock.now, credentialKey: KEY, spkiPins: opts.spkiPins, sampleIntervalSeconds: opts.sampleIntervalSeconds, trustProxy: opts.trustProxy,
     auth: opts.auth ?? { allowedOrigins: [ORIGIN] },
     // Sinir testleri disindaki testler cok sayida istegi ayni IP'den ve sabit saatle yapar: sinirlar yuksek tutulur.
-    limits: opts.limits ?? { enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000, loginPerKey: 100_000, loginPerIp: 100_000, setupPerIp: 100_000 } });
+    limits: opts.limits ?? { enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000, loginPerKey: 100_000, loginPerIp: 100_000, setupPerIp: 100_000, enrollTokenPerUser: 100_000 } });
   await app.ready();
   const org = (await db.pool.query("INSERT INTO orgs (name) VALUES ('org') RETURNING id")).rows[0].id as string;
   return { db, app, clock, org, async close() { await app.close(); await db.drop(); } };

@@ -10,6 +10,7 @@ import { registerSessionGuard } from "./session-guard.js";
 import { registerAuthRoutes } from "./users.js";
 import { registerDevices } from "./devices.js";
 import { registerMetricsQuery } from "./metrics-query.js";
+import { registerEnrollmentAdmin } from "./enrollment-admin.js";
 
 export interface AppOptions {
   pool: pg.Pool;
@@ -71,6 +72,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   registerAuthRoutes(app, opts.pool, now, sessionCfg, limiters);
   registerDevices(app, opts.pool, now, sampleIntervalSeconds);
   registerMetricsQuery(app, opts.pool, now);
+  registerEnrollmentAdmin(app, opts.pool, now, limiters);
   registerIngest(app, opts.pool, now, sampleIntervalSeconds, limiters);
   registerEnroll(app, opts.pool, now, opts.credentialKey, opts.spkiPins ?? [], limiters);
   registerRotate(app, opts.pool, now, opts.credentialKey, limiters);
