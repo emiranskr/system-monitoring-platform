@@ -122,7 +122,11 @@ describe("saklama ve sikistirma politikalari (D7)", () => {
 
     const chunks = await db.pool.query("SELECT show_chunks('metric_samples', older_than => now() - interval '1 day') AS c");
     expect(chunks.rows.length).toBeGreaterThan(0);
-    for (const row of chunks.rows) await db.pool.query("SELECT compress_chunk($1::regclass, if_not_compressed => true)", [row.c]);
+    // Arka plandaki sikistirma politikasi isi ayni chunk'i es zamanli sikistirabilir (if_not_compressed bu yarista bile "already compressed" atar): yut.
+    for (const row of chunks.rows) {
+      try { await db.pool.query("SELECT compress_chunk($1::regclass, if_not_compressed => true)", [row.c]); }
+      catch (e) { if (!/already compressed/.test((e as Error).message)) throw e; }
+    }
     const compressed = await db.pool.query("SELECT count(*)::int AS n FROM timescaledb_information.chunks WHERE hypertable_name='metric_samples' AND is_compressed");
     expect(compressed.rows[0].n).toBeGreaterThan(0);
 

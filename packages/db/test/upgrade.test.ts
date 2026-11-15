@@ -26,8 +26,11 @@ beforeAll(async () => {
      SELECT t, $1, $2, 'cpu.total', extract(epoch from t)::int % 100
        FROM generate_series(now() - interval '30 hours', now() - interval '29 hours', interval '1 second') t`, [org, dev]);
   // Veriyi iceren (1 gunluk) chunk'in BITISI "20 saat once"ten yeni olabilir: filtre kullanma, mevcut tum chunk'lari sikistir.
-  for (const c of (await db.pool.query("SELECT show_chunks('metric_samples') c")).rows)
-    await db.pool.query("SELECT compress_chunk($1::regclass, if_not_compressed => true)", [c.c]);
+  for (const c of (await db.pool.query("SELECT show_chunks('metric_samples') c")).rows) {
+    // Arka plandaki sikistirma isiyle yaris: "already compressed" yutulur (bkz. schema.test.ts).
+    try { await db.pool.query("SELECT compress_chunk($1::regclass, if_not_compressed => true)", [c.c]); }
+    catch (e) { if (!/already compressed/.test((e as Error).message)) throw e; }
+  }
 }, 180_000);
 
 afterAll(async () => {
@@ -41,7 +44,9 @@ describe("0003 doluluk ve kismi siksistirma uzerinde yukseltme", () => {
     const cmpBefore = Number((await db.pool.query("SELECT count(*)::int n FROM timescaledb_information.chunks WHERE hypertable_name='metric_samples' AND is_compressed")).rows[0].n);
     expect(cmpBefore).toBeGreaterThan(0);
 
-    expect(await migrate(db.pool)).toEqual(["0003_storage_tuning.sql"]);
+    // 0003 ve ondan sonraki TUM migration'lar uygulanir (yeni migration eklenince bu test kirilmasin).
+    const applied = await migrate(db.pool);
+    expect(applied[0]).toBe("0003_storage_tuning.sql");
 
     expect(Number((await db.pool.query("SELECT count(*) FROM metric_samples")).rows[0].count)).toBe(before); // veri kaybi yok
     // Sikistirilmis eski chunk'a (a) GERCEK yinelenen ve (b) yeni satir. Zaman damgasi SQL icinde alinir: JS Date mikrosaniyeyi
