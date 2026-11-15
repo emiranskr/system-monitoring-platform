@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { EnrollResponseSchema } from "@sysmon/protocol";
 import { createEnrollmentToken, purgeExpiredCredentials } from "../src/enrollment.js";
+import { buildApp } from "../src/app.js";
 import { enrollBody, ping, post, setupKit, sha256, type Kit } from "./kit.js";
 
 let k: Kit;
@@ -132,6 +133,40 @@ describe("enrollment (B2)", () => {
     expect(rs.map((r) => r.statusCode)).toEqual(Array(6).fill(200));
     expect(new Set(rs.map((r) => r.json().credential)).size).toBe(1);
     expect(await devicesCount()).toBe(before + 1);
+  });
+
+  // M-3a: yeniden deneme dali, token'in ozgun enrollment'a ait oldugunu denetlemiyordu: baska bir gecerli token ayni enroll_id ile credential alabilirdi.
+  it("yeniden deneme FARKLI (kullanilmamis) token ile 401; o token harcanmaz", async () => {
+    const t1 = await newToken(), t2 = await newToken();
+    const body = { enroll_id: "d0000000-0000-4000-8000-000000000001", machine_guid: "g-bind" };
+    expect((await enroll(t1, body)).statusCode).toBe(200);
+    expect((await enroll(t2, body)).statusCode).toBe(401);
+    const used = (await k.db.pool.query("SELECT used_at FROM enrollment_tokens WHERE org_id=$1 AND device_id IS NULL", [k.org])).rows;
+    expect(used.every((r) => r.used_at === null)).toBe(true);
+  });
+
+  // M-3b: ayni enroll_id, FARKLI token'lar (farkli token satir kilitleri) -> enrollments PK ihlali 500 olmamali.
+  it("ESZAMANLI ayni enroll_id farkli token'lar: 500 YOK, tam bir basari, tek cihaz", async () => {
+    const toks = await Promise.all(Array.from({ length: 6 }, () => newToken()));
+    const before = await devicesCount();
+    const rs = await Promise.all(toks.map((t) => enroll(t, { enroll_id: "d0000000-0000-4000-8000-000000000002", machine_guid: "g-race" })));
+    expect(rs.map((r) => r.statusCode).filter((s) => s !== 200 && s !== 401)).toEqual([]);
+    expect(rs.filter((r) => r.statusCode === 200).length).toBe(1);
+    expect(await devicesCount()).toBe(before + 1);
+  });
+
+  // M-3c: CREDENTIAL_KEY degisince yeniden deneme decrypt hatasiyla 500 olmamali (uniform 401).
+  it("sifreli kopya cozulemezse (anahtar degisti) yeniden deneme 500 degil 401", async () => {
+    const t = await newToken();
+    const body = { enroll_id: "d0000000-0000-4000-8000-000000000003", machine_guid: "g-key" };
+    expect((await enroll(t, body)).statusCode).toBe(200);
+    const other = buildApp({ pool: k.db.pool, now: () => k.clock.now, credentialKey: Buffer.alloc(32, 9), spkiPins: [PIN],
+      limits: { enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000 } });
+    try {
+      await other.ready();
+      const r = await other.inject({ method: "POST", url: "/agent/v1/enroll", headers: { "content-type": "application/json" }, payload: JSON.stringify(enrollBody(t, body)) });
+      expect(r.statusCode).toBe(401);
+    } finally { await other.close(); }
   });
 
   it("bilinmeyen alan veya kisa token -> 400 ve hicbir sey olusmaz", async () => {

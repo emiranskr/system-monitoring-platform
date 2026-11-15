@@ -21,6 +21,8 @@
 ## YARIN yapılacaklar (öncelik sırasıyla)
 1. `git status` kontrolü; bekleyen değişiklikleri commit'le (ingest `NOT EXISTS` düzeltmesi, `hardening.test.ts`, `upgrade.test.ts`, `createTestDb({migrate:false})`, belgeler).
 2. **I-5 kalanı:** `agent-e2e.test.ts` ve `tls-e2e.test.ts` `describe.skipIf(!enabled)` ile exe/openssl yoksa SESSİZCE yeşil kalıyor. Öneri: `SYSMON_REQUIRE_E2E=1` ise önkoşul yoksa testi başarısız say; exe'nin kaynaktan eski olup olmadığını da denetle.
+> **2026-11-15 güncelleme:** I-5 kalanı (SYSMON_REQUIRE_E2E + exe tazelik) `5c528e9`. **M-1 ÖLÇÜLDÜ: iddia yanlıştı** — Zod takvim-geçersiz tarihi zaten reddediyor (400, 500 YOK); davranış testle kilitlendi. **M-3 (a,b,c) ve M-6 düzeltildi** (kırmızı→yeşil testlerle). Kalan: M-2, M-7, M-11, M-10, sonra dar yeniden inceleme.
+
 3. **Düşük maliyetli Minor'lar (TDD):**
    - **M-1** takvim-geçersiz zaman damgası (`2026-02-31T…Z`) Zod'dan geçip PG 22008 ile **kalıcı 500** oluyor (agent 5xx'i geçici sayar: batch hiç atılmaz, hat tıkanır). Örnek düzeyinde reddet (`rejected++`), `sent_at` için 400; `NaN` tarih penceresini de aşıyor.
    - **M-3** aynı `enroll_id`, farklı token yarışında `enrollments` PK ihlali 500 olur (uniform 401 olmalı); `CREDENTIAL_KEY` değişince yeniden deneme `decrypt` 500'ü; retry dalı token'ın özgün enrollment'a ait olduğunu denetlemiyor.

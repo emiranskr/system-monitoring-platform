@@ -51,8 +51,8 @@ export function registerEnroll(app: FastifyInstance, pool: pg.Pool, now: () => D
     try {
       await c.query("BEGIN");
       // Token satirini KILITLE: ayni token ile eszamanli istekler siraya girer (tam bir basari).
-      const tok = await c.query<{ org_id: string; expires_at: Date; used_at: Date | null }>(
-        "SELECT org_id, expires_at, used_at FROM enrollment_tokens WHERE token_hash=$1 FOR UPDATE", [hashToken(b.token)]);
+      const tok = await c.query<{ org_id: string; expires_at: Date; used_at: Date | null; device_id: string | null }>(
+        "SELECT org_id, expires_at, used_at, device_id FROM enrollment_tokens WHERE token_hash=$1 FOR UPDATE", [hashToken(b.token)]);
       const tr = tok.rows[0];
       if (!tr) { await c.query("ROLLBACK"); throw unauthorized(); }
 
@@ -62,8 +62,11 @@ export function registerEnroll(app: FastifyInstance, pool: pg.Pool, now: () => D
       const p = prev.rows[0];
       if (p) {
         await c.query("ROLLBACK");
-        if (!p.machine_guid_hash.equals(machine) || !p.credential_enc || p.retry_expires_at <= t) throw unauthorized();
-        return reply.send(<EnrollResponse>{ device_id: p.device_id, credential: decrypt(key, p.credential_enc), spki_pins: spkiPins });
+        // Yeniden deneme yalnizca ozgun enrollment'i tamamlayan AYNI token ile (baska gecerli token ayni enroll_id ile credential alamaz).
+        if (!p.machine_guid_hash.equals(machine) || !p.credential_enc || p.retry_expires_at <= t || tr.device_id !== p.device_id) throw unauthorized();
+        let credential: string;
+        try { credential = decrypt(key, p.credential_enc); } catch { throw unauthorized(); } // anahtar degismis/bozuk kopya: 500 degil uniform 401
+        return reply.send(<EnrollResponse>{ device_id: p.device_id, credential, spki_pins: spkiPins });
       }
 
       if (tr.used_at || tr.expires_at <= t) { await c.query("ROLLBACK"); throw unauthorized(); }
@@ -83,6 +86,8 @@ export function registerEnroll(app: FastifyInstance, pool: pg.Pool, now: () => D
       return reply.send(<EnrollResponse>{ device_id: deviceId, credential, spki_pins: spkiPins });
     } catch (e) {
       try { await c.query("ROLLBACK"); } catch { /* zaten geri alinmis olabilir */ }
+      // Ayni enroll_id'li farkli-token yarisi: kaybeden enrollments PK'sini (23505) ihlal eder -> 500 degil uniform 401.
+      if ((e as { code?: string }).code === "23505") throw unauthorized();
       throw e;
     } finally {
       releaseGuarded(c);

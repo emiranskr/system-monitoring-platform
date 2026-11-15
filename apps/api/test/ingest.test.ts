@@ -286,6 +286,24 @@ describe("zaman damgasi sinirlari", () => {
     expect(await count(A, "a.old")).toBe(0);
     expect(await count(A, "a.future")).toBe(0);
   });
+
+  // M-1 (inceleme "kalici 500" demisti; OLCULDU: Zod takvim-gecersiz tarihi zaten reddeder -> 400, 500 YOK). Bu testler davranisi kilitler:
+  // 5xx olsaydi agent batch'i hic atmazdi; 4xx ise zehirli-batch sayaciyla atilir (agent gecersiz tarih uretmez).
+  it("takvimde olmayan ornek tarihi 5xx vermez: 400, hicbir veri yazilmaz", async () => {
+    const samples = [
+      { ts: "2026-02-31T10:00:00Z", m: { "a.bad": 1 } },
+      { ts: iso(new Date(now.getTime() - 3600_000)), m: { "a.ok": 1 } },
+    ];
+    const r = await post(body({ samples }, undefined, 4));
+    expect(r.statusCode).toBe(400);
+    expect(await count(A)).toBe(0);
+  });
+
+  it("takvimde olmayan sent_at 400 (gecici hata degil)", async () => {
+    const r = await post(body({ sent_at: "2026-02-31T10:00:00Z" }));
+    expect(r.statusCode).toBe(400);
+    expect(await count(A)).toBe(0);
+  });
 });
 
 describe("metrik adi", () => {

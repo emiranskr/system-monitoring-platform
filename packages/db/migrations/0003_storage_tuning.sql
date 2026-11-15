@@ -4,7 +4,7 @@
 -- Olculen: ham satir 212 -> 4,2 bayt (51x, karisik sentetik dagilim), 1 dk agrega satiri 171 -> 19,7 bayt (8,7x).
 -- Bedel: sikistirilmis chunk'a gec gelen veri (spool bosalmasi) eklenir (B0 spike dogruladi) ama sikistirilmamis eklemeden pahalidir.
 
-SELECT remove_compression_policy('metric_samples');
+SELECT remove_compression_policy('metric_samples', if_exists => true);
 -- Yalniz YENI chunk'lari etkiler; mevcutlar oldugu gibi kalir. compress_after >= chunk araligi olmalidir.
 SELECT set_chunk_time_interval('metric_samples', INTERVAL '6 hours');
 SELECT add_compression_policy('metric_samples', compress_after => INTERVAL '12 hours');
