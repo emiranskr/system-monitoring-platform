@@ -9,6 +9,7 @@ import { DEFAULT_SESSION_CONFIG, type SessionConfig } from "./sessions.js";
 import { registerSessionGuard } from "./session-guard.js";
 import { registerAuthRoutes } from "./users.js";
 import { registerDevices } from "./devices.js";
+import { registerMetricsQuery } from "./metrics-query.js";
 
 export interface AppOptions {
   pool: pg.Pool;
@@ -69,6 +70,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   const limiters = createLimiters(opts.limits, now);
   registerAuthRoutes(app, opts.pool, now, sessionCfg, limiters);
   registerDevices(app, opts.pool, now, sampleIntervalSeconds);
+  registerMetricsQuery(app, opts.pool, now);
   registerIngest(app, opts.pool, now, sampleIntervalSeconds, limiters);
   registerEnroll(app, opts.pool, now, opts.credentialKey, opts.spkiPins ?? [], limiters);
   registerRotate(app, opts.pool, now, opts.credentialKey, limiters);
