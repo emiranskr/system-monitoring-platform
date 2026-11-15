@@ -2,7 +2,8 @@
 import { execSync } from "node:child_process";
 import { isAllowed } from "./license-policy.mjs";
 
-const raw = execSync("pnpm licenses list --json", { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+// -r ZORUNLU: onsuz yalnizca KOK proje taranir (workspace paketlerinin bagimliliklari -fastify, pg, zod, argon2...- hic taranmazdi).
+const raw = execSync("pnpm licenses list -r --json", { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const byLicense = JSON.parse(raw);
 let bad = 0;
 let total = 0;
