@@ -25,8 +25,21 @@ public static partial class NicFilter
         if (n.Status != OperationalStatus.Up) return false;
         if (n.Type is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel) return false;
         if (FilterInstanceSuffix().IsMatch(n.Name)) return false;
-        return n.Addresses.Any(a => !IsLinkLocal(a) && !IPAddress.IsLoopback(a));
+        return n.Addresses.Any(a => !IsLinkLocal(a) && !IPAddress.IsLoopback(a) && !IsUnspecified(a));
     }
+
+    /// <summary>
+    /// Arayuz bilgisini tembel okur: GetIPProperties() gibi cagrilar bazi sanal adaptorlerde firlatabilir; o arayuz
+    /// izlenmez, istisna disari cikmaz (bir arayuz tum ag kolektorunu dusurmemeli).
+    /// </summary>
+    public static bool IsMonitored(Func<NicInfo> read)
+    {
+        try { return IsMonitored(read()); }
+        catch (Exception e) when (e is NetworkInformationException or InvalidOperationException or System.ComponentModel.Win32Exception or PlatformNotSupportedException)
+        { return false; }
+    }
+
+    private static bool IsUnspecified(IPAddress a) => a.Equals(IPAddress.Any) || a.Equals(IPAddress.IPv6Any);
 
     private static bool IsLinkLocal(IPAddress a)
     {

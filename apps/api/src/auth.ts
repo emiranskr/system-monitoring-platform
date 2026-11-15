@@ -2,7 +2,7 @@ import type pg from "pg";
 import { connectGuarded, releaseGuarded } from "./db.js";
 import { hashToken, parseBearer } from "./tokens.js";
 import { HttpError, unauthorized } from "./errors.js";
-import { rateLimited, type RateLimiter } from "./ratelimit.js";
+import { ipKey, rateLimited, type RateLimiter } from "./ratelimit.js";
 
 export interface AuthedDevice { orgId: string; deviceId: string; tokenHash: Buffer }
 
@@ -19,7 +19,7 @@ export async function authenticateGuarded(
   } catch (e) {
     // GECERLI token'lar sinirdan etkilenmez (inceleme I-2: aksi halde baskasinin/paylasilan IP'sinden basarisiz denemeler
     // gondererek filo kilitlenebilirdi). Yalniz GECERSIZ istekler sayilir; sinir asilinca 401 yerine 429 alirlar.
-    if (e instanceof HttpError && e.status === 401 && !failed.hit(req.ip)) throw rateLimited(failed);
+    if (e instanceof HttpError && e.status === 401 && !failed.hit(ipKey(req.ip))) throw rateLimited(failed);
     throw e;
   }
 }

@@ -19,6 +19,23 @@ public class NicFilterTests
     private static NicInfo Nic(string name, string desc = "Adapter", NetworkInterfaceType type = NetworkInterfaceType.Ethernet,
         OperationalStatus status = OperationalStatus.Up, params IPAddress[] addrs) => new(name, desc, type, status, addrs);
 
+    // M-10a: 0.0.0.0 ve :: "adres" sayilmaz (baglanti bilgisi olmayan arayuz).
+    [Fact]
+    public void Belirtilmemis_adresler_baglanti_sayilmaz()
+    {
+        Assert.False(NicFilter.IsMonitored(Nic("Ethernet 9", addrs: [IPAddress.Any, IPAddress.IPv6Any])));
+        Assert.True(NicFilter.IsMonitored(Nic("Ethernet 9", addrs: [IPAddress.Any, Private4])));
+    }
+
+    // M-10b: GetIPProperties() fırlatan tek bir sanal adaptor tum ag kolektorunu dusurmemeli: o arayuz atlanir.
+    [Fact]
+    public void Arayuz_bilgisi_okunurken_istisna_o_arayuzu_atlar_digerlerini_etkilemez()
+    {
+        Func<NicInfo> bad = () => throw new NetworkInformationException(1);
+        Assert.False(NicFilter.IsMonitored(bad));
+        Assert.True(NicFilter.IsMonitored(() => Nic("Ethernet", addrs: Private4)));
+    }
+
     [Theory]
     [InlineData("Ethernet-QoS Packet Scheduler-0000")]
     [InlineData("Ethernet-WFP Native MAC Layer LightWeight Filter-0000")]

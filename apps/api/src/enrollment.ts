@@ -5,7 +5,7 @@ import type pg from "pg";
 import { EnrollRequestSchema, type EnrollResponse } from "@sysmon/protocol";
 import { encrypt, decrypt, newCredential } from "./crypto.js";
 import { badRequest, unauthorized } from "./errors.js";
-import { rateLimited, type Limiters } from "./ratelimit.js";
+import { ipKey, rateLimited, type Limiters } from "./ratelimit.js";
 import { hashToken } from "./tokens.js";
 import { createHash } from "node:crypto";
 
@@ -38,7 +38,7 @@ const sha = (s: string) => createHash("sha256").update(s, "utf8").digest();
 export function registerEnroll(app: FastifyInstance, pool: pg.Pool, now: () => Date, key: Buffer, spkiPins: string[], limiters: Limiters): void {
   app.post("/agent/v1/enroll", async (req, reply) => {
     // IP basina deneme siniri: gecerli token olsa bile asilirsa 429 (enrollment token'i tahmin denemelerini yavaslatir).
-    if (!limiters.enrollPerIp.hit(req.ip)) throw rateLimited(limiters.enrollPerIp);
+    if (!limiters.enrollPerIp.hit(ipKey(req.ip))) throw rateLimited(limiters.enrollPerIp);
     let json: unknown;
     try { json = JSON.parse((req.body as Buffer).toString("utf8")); } catch { throw badRequest(); }
     const parsed = EnrollRequestSchema.safeParse(json);

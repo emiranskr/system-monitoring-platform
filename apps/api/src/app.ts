@@ -32,6 +32,9 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     throw new Error("sampleIntervalSeconds 1..300 arasi tam sayi olmalidir.");
   }
   const now = opts.now ?? (() => new Date());
+  const REQUEST_TIMEOUT_MS = 30_000; // istek (basliktan govdenin sonuna) tamamlanma suresi; 1 MB govde icin cömertçe yeterli
+  const CONNECTION_TIMEOUT_MS = 120_000; // bosta/yarim kalan baglanti (socket) zaman asimi
+  const MAX_REQUESTS_PER_SOCKET = 1000;
   const app = Fastify({
     ...(opts.https ? { https: { key: opts.https.key, cert: opts.https.cert, minVersion: "TLSv1.2" as const } } : {}),
     logger: opts.logger
@@ -39,6 +42,10 @@ export function buildApp(opts: AppOptions): FastifyInstance {
       : false,
     trustProxy: opts.trustProxy ?? false,
     bodyLimit: MAX_COMPRESSED_BYTES,
+    // Yavas-yukleme (slowloris) korumasi; dogrudan TLS dagitiminda onde bir ters vekil olmayabilir.
+    requestTimeout: REQUEST_TIMEOUT_MS,
+    connectionTimeout: CONNECTION_TIMEOUT_MS,
+    maxRequestsPerSocket: MAX_REQUESTS_PER_SOCKET,
   });
 
   // Govde ham tampon: sikistirilmis <= 1 MB (asimda Fastify 413); gzip ve JSON her rota icinde sinirli islenir.

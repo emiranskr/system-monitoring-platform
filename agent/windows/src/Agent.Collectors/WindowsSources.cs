@@ -47,13 +47,21 @@ public sealed class SystemNetworkSource : INetworkSource
 {
     public IReadOnlyList<NicCounters> Read() =>
         NetworkInterface.GetAllNetworkInterfaces()
-            .Where(n => NicFilter.IsMonitored(new NicInfo(n.Name, n.Description, n.NetworkInterfaceType, n.OperationalStatus,
+            .Where(n => NicFilter.IsMonitored(() => new NicInfo(n.Name, n.Description, n.NetworkInterfaceType, n.OperationalStatus,
                 n.GetIPProperties().UnicastAddresses.Select(u => u.Address).ToList())))
             .Select(n =>
             {
-                var s = n.GetIPStatistics();
-                return new NicCounters(n.Name, (ulong)s.BytesReceived, (ulong)s.BytesSent);
+                try
+                {
+                    var s = n.GetIPStatistics();
+                    return new NicCounters(n.Name, (ulong)s.BytesReceived, (ulong)s.BytesSent);
+                }
+                catch (Exception e) when (e is NetworkInformationException or InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    return null; // sayaclari okunamayan arayuz atlanir
+                }
             })
+            .OfType<NicCounters>()
             .ToList();
 }
 
