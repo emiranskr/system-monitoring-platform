@@ -5,6 +5,8 @@ import { registerEnroll } from "./enrollment.js";
 import { registerIngest, MAX_COMPRESSED_BYTES } from "./ingest.js";
 import { registerRotate } from "./rotation.js";
 import { createLimiters, type Limits } from "./ratelimit.js";
+import { DEFAULT_SESSION_CONFIG, type SessionConfig } from "./sessions.js";
+import { registerSessionGuard } from "./session-guard.js";
 
 export interface AppOptions {
   pool: pg.Pool;
@@ -23,6 +25,8 @@ export interface AppOptions {
   limits?: Limits;
   /** Verilirse sunucu HTTPS dinler (TLS >= 1.2). Agent (Release) yalnizca HTTPS kabul eder. */
   https?: { key: string | Buffer; cert: string | Buffer };
+  /** Panel (/api/v1) oturum ve CSRF ayarlari. allowedOrigins bos (varsayilan) ise durum degistiren /api/v1 istekleri REDDEDILIR. */
+  auth?: { allowedOrigins: string[]; idleMinutes?: number; absoluteHours?: number };
 }
 
 export function buildApp(opts: AppOptions): FastifyInstance {
@@ -52,6 +56,13 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   app.addContentTypeParser("application/json", { parseAs: "buffer", bodyLimit: MAX_COMPRESSED_BYTES }, (_req, body, done) => {
     done(null, body);
   });
+
+  const sessionCfg: SessionConfig = {
+    idleMs: (opts.auth?.idleMinutes ?? DEFAULT_SESSION_CONFIG.idleMs / 60_000) * 60_000,
+    absoluteMs: (opts.auth?.absoluteHours ?? DEFAULT_SESSION_CONFIG.absoluteMs / 3600_000) * 3600_000,
+  };
+  // Oturum kapisi, /api/v1 rotalarindan ONCE kaydedilir (Fastify kancalari yalniz sonradan tanimlanan rotalara uygulanir).
+  registerSessionGuard(app, opts.pool, now, sessionCfg, opts.auth?.allowedOrigins ?? []);
 
   const limiters = createLimiters(opts.limits, now);
   registerIngest(app, opts.pool, now, sampleIntervalSeconds, limiters);
