@@ -15,12 +15,16 @@ export interface Kit {
 
 export const KEY = Buffer.alloc(32, 7); // test AES-256 anahtari
 
-export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number; trustProxy?: boolean | string[]; limits?: AppOptions["limits"] } = {}): Promise<Kit> {
+/** Panel testlerinde izinli Origin (CSRF denetimi). */
+export const ORIGIN = "https://panel.example.test";
+
+export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number; trustProxy?: boolean | string[]; limits?: AppOptions["limits"]; auth?: AppOptions["auth"] } = {}): Promise<Kit> {
   const db = await createTestDb();
   const clock = { now: new Date("2026-11-12T12:00:00Z") };
   const app = buildApp({ pool: db.pool, now: () => clock.now, credentialKey: KEY, spkiPins: opts.spkiPins, sampleIntervalSeconds: opts.sampleIntervalSeconds, trustProxy: opts.trustProxy,
+    auth: opts.auth ?? { allowedOrigins: [ORIGIN] },
     // Sinir testleri disindaki testler cok sayida istegi ayni IP'den ve sabit saatle yapar: sinirlar yuksek tutulur.
-    limits: opts.limits ?? { enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000 } });
+    limits: opts.limits ?? { enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000, loginPerKey: 100_000, loginPerIp: 100_000, setupPerIp: 100_000 } });
   await app.ready();
   const org = (await db.pool.query("INSERT INTO orgs (name) VALUES ('org') RETURNING id")).rows[0].id as string;
   return { db, app, clock, org, async close() { await app.close(); await db.drop(); } };
@@ -48,4 +52,37 @@ export function ping(k: Kit, token: string, seq = 0, epoch = "11111111-1111-4111
     headers: { "content-type": "application/json", "content-encoding": "gzip", authorization: `Bearer ${token}` },
     payload: gzipSync(Buffer.from(JSON.stringify(payload))),
   });
+}
+
+/** Panel (/api/v1) istegi: izinli Origin ile; cookie verilirse oturumlu. */
+export const api = (k: Kit, method: "GET" | "POST", url: string, opts: { body?: unknown; cookie?: string; origin?: string | null } = {}) =>
+  k.app.inject({
+    method, url,
+    headers: {
+      ...(opts.body !== undefined ? { "content-type": "application/json" } : {}),
+      ...(opts.cookie ? { cookie: opts.cookie } : {}),
+      ...(opts.origin === null ? {} : { origin: opts.origin ?? ORIGIN }),
+    },
+    ...(opts.body !== undefined ? { payload: JSON.stringify(opts.body) } : {}),
+  });
+
+/** Yanittaki Set-Cookie'den "ad=deger" cerez cifti (istek Cookie basligi icin); yoksa null. */
+export function cookieFrom(res: { headers: Record<string, unknown> }): string | null {
+  const sc = res.headers["set-cookie"];
+  const s = Array.isArray(sc) ? sc[0] : sc;
+  return typeof s === "string" && !/Max-Age=0/i.test(s) ? s.split(";")[0]! : null;
+}
+
+/** Dogrudan DB'ye kullanici ekler (parola ozeti gercek argon2id). */
+export async function addUser(k: Kit, email: string, password: string, role: "owner" | "admin" | "viewer" = "admin", orgId = k.org): Promise<string> {
+  const { hashPassword } = await import("../src/password.js");
+  return (await k.db.pool.query("INSERT INTO users (org_id, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING id", [orgId, email, await hashPassword(password), role])).rows[0].id as string;
+}
+
+/** Giris yapar, oturum cerezini (ad=deger) doner. */
+export async function loginAs(k: Kit, email: string, password: string): Promise<string> {
+  const r = await api(k, "POST", "/api/v1/login", { body: { email, password } });
+  const c = cookieFrom(r);
+  if (r.statusCode !== 200 || !c) throw new Error(`giris basarisiz: ${r.statusCode} ${r.body}`);
+  return c;
 }

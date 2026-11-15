@@ -73,6 +73,12 @@ export interface Limits {
   enrollPerIp?: number;
   /** Cihaz basina rotation istegi / pencere. */
   rotatePerDevice?: number;
+  /** IP+e-posta basina giris denemesi / pencere (kaba kuvvet; sinirdayken dogru parola da denenmez). */
+  loginPerKey?: number;
+  /** IP basina toplam giris denemesi / pencere (cok e-postaya puskurtme). */
+  loginPerIp?: number;
+  /** IP basina ilk kurulum (setup) denemesi / pencere. */
+  setupPerIp?: number;
   windowMs?: number;
 }
 
@@ -81,6 +87,9 @@ export interface Limiters {
   failedAuthPerIp: RateLimiter;
   enrollPerIp: RateLimiter;
   rotatePerDevice: RateLimiter;
+  loginPerKey: RateLimiter;
+  loginPerIp: RateLimiter;
+  setupPerIp: RateLimiter;
 }
 
 export function createLimiters(l: Limits | undefined, now: () => Date): Limiters {
@@ -92,6 +101,9 @@ export function createLimiters(l: Limits | undefined, now: () => Date): Limiters
     // sinir asil olarak yuk ve rastgele denemeleri yavaslatmak icindir.
     enrollPerIp: new RateLimiter(l?.enrollPerIp ?? 60, w, now),
     rotatePerDevice: new RateLimiter(l?.rotatePerDevice ?? 10, w, now),
+    loginPerKey: new RateLimiter(l?.loginPerKey ?? 10, w, now),
+    loginPerIp: new RateLimiter(l?.loginPerIp ?? 60, w, now),
+    setupPerIp: new RateLimiter(l?.setupPerIp ?? 10, w, now),
   };
 }
 

@@ -4,11 +4,12 @@ import { buildApp } from "./app.js";
 import { parseTrustProxy } from "./config.js";
 import { purgeExpiredCredentials } from "./enrollment.js";
 import { createPool } from "./pool.js";
+import { ensureSetupToken } from "./users.js";
 
 /**
  * Yapilandirma ortam degiskenleriyle: DATABASE_URL (zorunlu), CREDENTIAL_KEY (zorunlu, 32 bayt base64: credential'larin
  * yeniden deneme penceresi boyunca sifreli tutulmasi), PORT (8443), HOST (127.0.0.1), SPKI_PINS (virgulle ayrilmis
- * sha256/<b64>), SAMPLE_INTERVAL_SECONDS (5; agent ornekleme araligi), LOG_LEVEL (info), TRUST_PROXY (kapali; ters proxy arkasinda guvenilen proxy IP/CIDR LISTESI, orn. 127.0.0.1,10.0.0.0/8; "true" ve sayisal atlama sayisi REDDEDILIR), MIGRATE ("1" = acilista migrate).
+ * sha256/<b64>), SAMPLE_INTERVAL_SECONDS (5; agent ornekleme araligi), LOG_LEVEL (info), ALLOWED_ORIGINS (panel kokenleri, virgullu; bos = giris dahil durum degistiren /api/v1 istekleri reddedilir), SESSION_IDLE_MINUTES (30), SESSION_ABSOLUTE_HOURS (12), TRUST_PROXY (kapali; ters proxy arkasinda guvenilen proxy IP/CIDR LISTESI, orn. 127.0.0.1,10.0.0.0/8; "true" ve sayisal atlama sayisi REDDEDILIR), MIGRATE ("1" = acilista migrate).
  * TLS_CERT + TLS_KEY (PEM dosya yollari) verilirse HTTPS dinler (TLS >= 1.2); verilmezse DUZ HTTP: Agent (Release) yalnizca
  * HTTPS kabul ettiginden uretimde TLS ya burada ya da onundeki ters proxy'de sonlandirilmalidir (TRUST_PROXY ile).
  */
@@ -28,8 +29,17 @@ const app = buildApp({
     : undefined,
   sampleIntervalSeconds: process.env.SAMPLE_INTERVAL_SECONDS ? Number(process.env.SAMPLE_INTERVAL_SECONDS) : undefined,
   spkiPins: (process.env.SPKI_PINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+  auth: {
+    // Panelin kokeni (CSRF Origin denetimi). Bos ise durum degistiren /api/v1 istekleri (giris dahil) reddedilir.
+    allowedOrigins: (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+    idleMinutes: process.env.SESSION_IDLE_MINUTES ? Number(process.env.SESSION_IDLE_MINUTES) : undefined,
+    absoluteHours: process.env.SESSION_ABSOLUTE_HOURS ? Number(process.env.SESSION_ABSOLUTE_HOURS) : undefined,
+  },
 });
 await app.listen({ port: Number(process.env.PORT ?? 8443), host: process.env.HOST ?? "127.0.0.1" });
+
+// Ilk kurulum: kullanici yoksa tek kullanimlik token surec stderr'ine BIR kez yazilir (yapilandirilmis gunluge/dosyaya DEGIL).
+await ensureSetupToken(pool, new Date(), (m) => process.stderr.write(m));
 
 // Suresi dolan sifreli credential kopyalari dakikada bir silinir (yalnizca bellekte calisan zamanlayici; migrasyon gerektirmez).
 const purge = setInterval(() => { void purgeExpiredCredentials(pool).catch((e) => app.log.error({ err: String(e) }, "purge hatasi")); }, 60_000);
