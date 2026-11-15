@@ -1,6 +1,6 @@
 # M3a — Kullanıcılar, Oturumlar, Okuma API'si, SSE (durum)
 
-Tarih: 2026-11-15. Dal: `feat/m3a-backend` (taban `feat/m1-agent` @ `caea950`). Tasarım: `docs/superpowers/specs/2026-11-15-m3-auth-panel-design.md`; plan: `docs/superpowers/plans/2026-11-15-m3a-backend.md`. **Birleştirilmedi, push yok. Bağımsız inceleme henüz yapılmadı** (kapanış ölçütü: Critical 0 / Important 0).
+Tarih: 2026-11-15. Dal: `feat/m3a-backend` (taban `feat/m1-agent` @ `caea950`). Tasarım: `docs/superpowers/specs/2026-11-15-m3-auth-panel-design.md`; plan: `docs/superpowers/plans/2026-11-15-m3a-backend.md`. **Birleştirilmedi, push yok.** **Bağımsız inceleme yapıldı: RET (Critical 0, Important 2)** — ayrıntı ve yarınki iş sırası `docs/ilerleme/M3a-bagimsiz-inceleme.md`. I-1 (kodlu yolla oturum kapısı atlatma) ve I-2 (SSE sayaç/abonelik sızıntısı) kapanmadan M3a kabul edilmez. Aşağıdaki §3'teki "ham sıkıştırma" ifadesi YANLIŞTIR (bkz. inceleme M-4a).
 
 ## 1. Yapılanlar ve kanıtlar
 | Görev | Çıktı | Kanıt |
