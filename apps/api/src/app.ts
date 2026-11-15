@@ -65,6 +65,11 @@ export function buildApp(opts: AppOptions): FastifyInstance {
     done(null, body);
   });
 
+  // Kayitli rotalarin listesi (yalniz IDOR/rota-kapsam testi icin okunur): yeni bir rota eklenir de siniflandirilmazsa test kirilir.
+  const routes: string[] = [];
+  app.addHook("onRoute", (r) => { for (const m of [r.method].flat()) if (m !== "HEAD") routes.push(`${m} ${r.url}`); });
+  app.decorate("registeredRoutes", routes);
+
   const sessionCfg: SessionConfig = {
     idleMs: (opts.auth?.idleMinutes ?? DEFAULT_SESSION_CONFIG.idleMs / 60_000) * 60_000,
     absoluteMs: (opts.auth?.absoluteHours ?? DEFAULT_SESSION_CONFIG.absoluteMs / 3600_000) * 3600_000,

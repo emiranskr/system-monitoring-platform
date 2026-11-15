@@ -7,7 +7,7 @@ export interface SampleEvent {
 }
 
 declare module "fastify" {
-  interface FastifyInstance { sampleBus: SampleBus }
+  interface FastifyInstance { sampleBus: SampleBus; registeredRoutes: string[] }
 }
 
 /**
