@@ -18,11 +18,11 @@ export const KEY = Buffer.alloc(32, 7); // test AES-256 anahtari
 /** Panel testlerinde izinli Origin (CSRF denetimi). */
 export const ORIGIN = "https://panel.example.test";
 
-export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number; trustProxy?: boolean | string[]; limits?: AppOptions["limits"]; auth?: AppOptions["auth"] } = {}): Promise<Kit> {
+export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number; trustProxy?: boolean | string[]; limits?: AppOptions["limits"]; auth?: AppOptions["auth"]; stream?: AppOptions["stream"] } = {}): Promise<Kit> {
   const db = await createTestDb();
   const clock = { now: new Date("2026-11-12T12:00:00Z") };
   const app = buildApp({ pool: db.pool, now: () => clock.now, credentialKey: KEY, spkiPins: opts.spkiPins, sampleIntervalSeconds: opts.sampleIntervalSeconds, trustProxy: opts.trustProxy,
-    auth: opts.auth ?? { allowedOrigins: [ORIGIN] },
+    auth: opts.auth ?? { allowedOrigins: [ORIGIN] }, stream: opts.stream,
     // Sinir testleri disindaki testler cok sayida istegi ayni IP'den ve sabit saatle yapar: sinirlar yuksek tutulur.
     limits: opts.limits ?? { enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000, loginPerKey: 100_000, loginPerIp: 100_000, setupPerIp: 100_000, enrollTokenPerUser: 100_000 } });
   await app.ready();

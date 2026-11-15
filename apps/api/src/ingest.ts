@@ -8,6 +8,7 @@ import { MAX_SAMPLES_PER_BATCH, METRIC_NAME_RE, MetricValueSchema } from "@sysmo
 import { authenticateGuarded, type AuthedDevice } from "./auth.js";
 import { rateLimited, type Limiters } from "./ratelimit.js";
 import { HttpError } from "./errors.js";
+import type { SampleBus, SampleEvent } from "./events.js";
 
 const gunzipAsync = promisify(gunzip);
 
@@ -45,7 +46,17 @@ declare module "fastify" {
 
 const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 
-export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => Date, sampleIntervalSeconds: number, limiters: Limiters): void {
+/** Batch'teki EN YENI ornegin metriklerinden olay uretir (panel son degeri gosterir; tam gecmis sorguyla gelir). */
+function latestEvent(d: Device, ts: string[], metric: string[], value: (number | null)[]): SampleEvent {
+  let best = 0;
+  for (let i = 1; i < ts.length; i++) if (new Date(ts[i]!).getTime() > new Date(ts[best]!).getTime()) best = i;
+  const bestT = new Date(ts[best]!).getTime();
+  const values: Record<string, number | null> = {};
+  for (let i = 0; i < ts.length; i++) if (new Date(ts[i]!).getTime() === bestT) values[metric[i]!] = value[i]!;
+  return { orgId: d.orgId, deviceId: d.deviceId, t: new Date(bestT).toISOString(), values };
+}
+
+export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => Date, sampleIntervalSeconds: number, limiters: Limiters, bus: SampleBus): void {
   app.route({
     method: "POST",
     url: "/agent/v1/ingest",
@@ -94,7 +105,11 @@ export function registerIngest(app: FastifyInstance, pool: pg.Pool, now: () => D
         }
       }
 
-      const ack = await commit(pool, device, b.spool_epoch, b.seq, { ts, metric, value }, t);
+      const { ack, fresh } = await commit(pool, device, b.spool_epoch, b.seq, { ts, metric, value }, t);
+      // Canli akis: yalnizca YENI islenen batch, COMMIT SONRASI, abone varsa; hata ingest'i etkilemez (events.ts).
+      if (fresh && ts.length > 0 && bus.hasSubscribers(device.orgId)) {
+        try { bus.publish(latestEvent(device, ts, metric, value)); } catch { /* yayin hatasi ingest'i bozmaz */ }
+      }
       return reply.send({ ack_seq: ack, rejected, server_time: iso(t), config: { interval_seconds: sampleIntervalSeconds } });
     },
   });
@@ -126,7 +141,7 @@ async function decodeBody(req: FastifyRequest): Promise<Buffer> {
 async function commit(
   pool: pg.Pool, d: Device, epoch: string, seq: number,
   rows: { ts: string[]; metric: string[]; value: (number | null)[] }, t: Date,
-): Promise<number> {
+): Promise<{ ack: number; fresh: boolean }> {
   const c = await connectGuarded(pool);
   try {
     await c.query("BEGIN");
@@ -141,7 +156,7 @@ async function commit(
     const last = Number(st.rows[0]!.last_seq);
     if (seq <= last) {
       await c.query("COMMIT");
-      return last; // yinelenen batch: veri zaten islendi
+      return { ack: last, fresh: false }; // yinelenen batch: veri zaten islendi (yayinlanmaz)
     }
     if (rows.ts.length > 0) {
       await c.query(
@@ -158,7 +173,7 @@ async function commit(
     await c.query("UPDATE device_ingest_state SET last_seq=$3, updated_at=$4 WHERE device_id=$1 AND spool_epoch=$2", [d.deviceId, epoch, seq, t]);
     await c.query("UPDATE devices SET last_seen_at=$2 WHERE id=$1", [d.deviceId, t]);
     await c.query("COMMIT");
-    return seq;
+    return { ack: seq, fresh: true };
   } catch (e) {
     try { await c.query("ROLLBACK"); } catch { /* baglanti kopmus olabilir */ }
     throw e;

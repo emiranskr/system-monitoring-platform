@@ -28,7 +28,7 @@ export async function createSession(
 }
 
 /** Gecerliyse kullaniciyi verir; yok / bosta asimi / mutlak asim / devre disi kullanici -> null (suresi dolan satir silinir). */
-export async function resolveSession(pool: pg.Pool, rawId: string, now: Date, cfg: SessionConfig): Promise<SessionUser | null> {
+export async function resolveSession(pool: pg.Pool, rawId: string, now: Date, cfg: SessionConfig, opts: { touch?: boolean } = {}): Promise<SessionUser | null> {
   if (!rawId || rawId.length > MAX_RAW_LENGTH) return null;
   const key = digest(rawId);
   const r = await pool.query<{ org_id: string; user_id: string; last_seen_at: Date; expires_at: Date; role: Role; email: string; disabled_at: Date | null }>(
@@ -41,7 +41,8 @@ export async function resolveSession(pool: pg.Pool, rawId: string, now: Date, cf
     await pool.query("DELETE FROM sessions WHERE id_hash = $1", [key]);
     return null;
   }
-  if (now.getTime() - s.last_seen_at.getTime() >= TOUCH_INTERVAL_MS) {
+  // touch:false (SSE yeniden dogrulamasi): oturumu CANLI TUTMAZ; acik bir akis bosta asimini fiilen kapatmasin.
+  if (opts.touch !== false && now.getTime() - s.last_seen_at.getTime() >= TOUCH_INTERVAL_MS) {
     await pool.query("UPDATE sessions SET last_seen_at = $2 WHERE id_hash = $1", [key, now]);
   }
   return { userId: s.user_id, orgId: s.org_id, role: s.role, email: s.email, sessionKey: key.toString("hex") };

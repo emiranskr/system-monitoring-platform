@@ -75,6 +75,14 @@ describe("oturumlar", () => {
     expect(c.getTime()).toBe(at(70_000).getTime());
   });
 
+  it("touch:false (SSE yeniden dogrulamasi) oturumu CANLI TUTMAZ: bosta sayaci yenilenmez, 31. dk'da yine asilir", async () => {
+    const s = await make();
+    for (let m = 5; m <= 25; m += 5) expect(await resolveSession(db.pool, s.id, at(m * MIN), cfg, { touch: false })).not.toBeNull();
+    const seen = (await db.pool.query("SELECT last_seen_at FROM sessions")).rows[0].last_seen_at as Date;
+    expect(seen.getTime()).toBe(T0.getTime());
+    expect(await resolveSession(db.pool, s.id, at(31 * MIN), cfg, { touch: false })).toBeNull();
+  });
+
   it("revokeSession sonrasi null", async () => {
     const s = await make();
     await revokeSession(db.pool, s.id);

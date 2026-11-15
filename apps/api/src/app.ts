@@ -11,6 +11,8 @@ import { registerAuthRoutes } from "./users.js";
 import { registerDevices } from "./devices.js";
 import { registerMetricsQuery } from "./metrics-query.js";
 import { registerEnrollmentAdmin } from "./enrollment-admin.js";
+import { SampleBus } from "./events.js";
+import { registerStream, type StreamOptions } from "./stream.js";
 
 export interface AppOptions {
   pool: pg.Pool;
@@ -31,6 +33,8 @@ export interface AppOptions {
   https?: { key: string | Buffer; cert: string | Buffer };
   /** Panel (/api/v1) oturum ve CSRF ayarlari. allowedOrigins bos (varsayilan) ise durum degistiren /api/v1 istekleri REDDEDILIR. */
   auth?: { allowedOrigins: string[]; idleMinutes?: number; absoluteHours?: number };
+  /** SSE zamanlayicilari (varsayilan: kalp atisi 25 sn, oturum yeniden dogrulama 60 sn); testler kisaltir. */
+  stream?: StreamOptions;
 }
 
 export function buildApp(opts: AppOptions): FastifyInstance {
@@ -73,7 +77,10 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   registerDevices(app, opts.pool, now, sampleIntervalSeconds);
   registerMetricsQuery(app, opts.pool, now);
   registerEnrollmentAdmin(app, opts.pool, now, limiters);
-  registerIngest(app, opts.pool, now, sampleIntervalSeconds, limiters);
+  const bus = new SampleBus();
+  app.decorate("sampleBus", bus);
+  registerIngest(app, opts.pool, now, sampleIntervalSeconds, limiters, bus);
+  registerStream(app, opts.pool, now, sessionCfg, bus, opts.stream);
   registerEnroll(app, opts.pool, now, opts.credentialKey, opts.spkiPins ?? [], limiters);
   registerRotate(app, opts.pool, now, opts.credentialKey, limiters);
 
