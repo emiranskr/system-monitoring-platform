@@ -1,5 +1,7 @@
 # M2 Devir Notu — 2026-11-12 akşam (yarın buradan devam)
 
+> **2026-11-15 SON DURUM: M2 KAPANDI ve BİRLEŞTİRİLDİ.** Dar bağımsız yeniden inceleme (`61b619d..HEAD`): Critical 0 / Important 0 (kabul). ChatGPT birleştirmeyi onayladı; `feat/m2-backend` → `feat/m1-agent` fast-forward yapıldı (yerel, push yok), HEAD `5cf2feb`. ChatGPT: M3'e paralel geçilebilir. **Açık takip işleri:** A5 servis doğrulaması (UAC), resmi 30 dk B6, B-5 kanıtı (150 GB), gerçekçi agrega sıkıştırma; Minor: `migrate()` 15 sn `statement_timeout`, auth'ta sınırı aşan IP'nin geçersiz istekleri DB'ye iniyor. **Sıradaki: M3 (Auth + panel v1)** — kabul: giriş; filo/cihaz görünümleri; p95 örnekten ekrana < 10 sn; B-6 sorgu bütçeleri; axe'ta kritik ihlal yok (proposal.md §9, M tablosu). Aşağıdaki liste tarihsel kayıttır (maddelerin çoğu yapıldı).
+
 ## Durum özeti
 - **Dal:** `feat/m2-backend` (taban `feat/m1-agent` @ `515f5fc`). **Birleştirilmedi, M3'e geçilmedi, push yok.**
 - **M1:** `feat/m1-agent`'ta tamamlandı (kapanış onayı kullanıcının devrettiği ChatGPT'den alındı).
