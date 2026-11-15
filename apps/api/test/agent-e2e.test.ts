@@ -1,5 +1,5 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { FastifyInstance } from "fastify";
@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "@sysmon/db/testing";
 import { buildApp } from "../src/app.js";
 import { hashToken } from "../src/tokens.js";
+import { e2eEnabled } from "./e2e-guard.js";
 
 /**
  * GERCEK uca-uca: gercek .NET agent (Debug derlemesi, loopback http bayragiyla) gercek Fastify API'ye ve gercek
@@ -14,7 +15,7 @@ import { hashToken } from "../src/tokens.js";
  * Yalnizca Windows'ta ve Agent.Service.exe derlenmisse kosar (aksi halde atlanir).
  */
 const exe = resolve(__dirname, "../../../agent/windows/src/Agent.Service/bin/Debug/net10.0-windows/Agent.Service.exe");
-const enabled = process.platform === "win32" && existsSync(exe);
+const enabled = e2eEnabled("agent-e2e", exe);
 
 describe.skipIf(!enabled)("agent <-> API uca-uca (gercek surec)", () => {
   let db: TestDb;

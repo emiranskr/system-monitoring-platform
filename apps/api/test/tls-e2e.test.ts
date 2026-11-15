@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestDb, type TestDb } from "@sysmon/db/testing";
 import { buildApp } from "../src/app.js";
 import { hashToken } from "../src/tokens.js";
+import { e2eEnabled } from "./e2e-guard.js";
 
 /**
  * GERCEK HTTPS uca-uca: agent'in RELEASE derlemesi (yalnizca https kabul eder) gercek Fastify HTTPS sunucusuna ve gercek
@@ -17,7 +18,7 @@ import { hashToken } from "../src/tokens.js";
  */
 const exe = resolve(__dirname, "../../../agent/windows/src/Agent.Service/bin/Release/net10.0-windows/Agent.Service.exe");
 const haveOpenssl = spawnSync("openssl", ["version"]).status === 0;
-const enabled = process.platform === "win32" && existsSync(exe) && haveOpenssl;
+const enabled = e2eEnabled("tls-e2e", exe, [{ name: "openssl", ok: haveOpenssl }]);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const waitFor = async (cond: () => Promise<boolean>, ms: number, what: string) => {
