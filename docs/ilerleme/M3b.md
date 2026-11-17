@@ -8,7 +8,7 @@ Tarih: 2026-11-17 (devam ediyor). Dal: `feat/m3b-web` (taban `feat/m1-agent` @ `
 | G1 Protocol sözleşmesi (zod) + OpenAPI 3.1 + güncellik testi | **Tamam** `30afa50` | `packages/protocol` 24 test; `docs/api/openapi.json`; mutasyon yakalandı |
 | G2 Backend `metric-names` + sözleşme testleri (tüm yanıtlar şemayla, SSE gövdesi dahil) | **Tamam** `5c522da` | api 273 test; 3 mutasyon yakalandı, `ORDER BY` mutasyonu bu ortamda EŞDEĞER (kolasyon C + planlayıcı sıralı gruplama) — sıralama garantisi sorguda duruyor |
 | G3 `apps/web` iskeleti (Vite 8, React 19, Tailwind v4, Inter, tokenlar, kontrast + ham-HTML-yasağı testleri) | **Tamam** `2454e5c` | web 12 test; lisans 218 paket 0 izinsiz |
-| G4 API istemcisi + oturum + Giriş | Bekliyor | |
+| G4 API istemcisi + oturum + Giriş | **Tamam** `8eebf1f` | web 48 test; mutasyonlar: sözleşme doğrulaması, keep-alive görünürlük, login-401 ayrımı yakalandı; safeNext `//` kontrolü EŞDEĞER (URL kökeni kontrolü aynı girdiyi reddediyor, bilinçli savunma derinliği) |
 | G5 Genel bakış + Cihaz listesi | Bekliyor | |
 | G6 Cihaz detayı + grafikler | Bekliyor | |
 | G7 "Cihaz ekle" | Bekliyor | |
