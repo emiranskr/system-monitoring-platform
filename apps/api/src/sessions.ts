@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { isIP } from "node:net";
 import type pg from "pg";
 
 export type Role = "owner" | "admin" | "viewer";
@@ -15,6 +16,12 @@ const MAX_RAW_LENGTH = 128;
 
 const digest = (raw: string) => createHash("sha256").update(raw, "utf8").digest();
 
+/** `inet` sutunu icin: bolge kimligi (%eth0) kirpilir, gecerli IP degilse null (giris, IP metni yuzunden 500 vermemeli). */
+function cleanIp(ip?: string): string | null {
+  const bare = ip?.split("%")[0];
+  return bare && isIP(bare) ? bare : null;
+}
+
 export async function createSession(
   pool: pg.Pool, user: { id: string; orgId: string }, now: Date, cfg: SessionConfig, meta: { ip?: string; ua?: string },
 ): Promise<{ id: string; expiresAt: Date }> {
@@ -22,7 +29,7 @@ export async function createSession(
   const expiresAt = new Date(now.getTime() + cfg.absoluteMs);
   await pool.query(
     "INSERT INTO sessions (id_hash, org_id, user_id, created_at, last_seen_at, expires_at, ip, ua) VALUES ($1,$2,$3,$4,$4,$5,$6,$7)",
-    [digest(id), user.orgId, user.id, now, expiresAt, meta.ip ?? null, meta.ua?.slice(0, 256) ?? null],
+    [digest(id), user.orgId, user.id, now, expiresAt, cleanIp(meta.ip), meta.ua?.slice(0, 256) ?? null],
   );
   return { id, expiresAt };
 }

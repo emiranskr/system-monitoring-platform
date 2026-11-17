@@ -233,6 +233,23 @@ describe("GET /api/v1/stream", () => {
     } finally { s.close(); }
   });
 
+  // M-2 (inceleme): "acik akis bosta asimini uzatmaz" karari yalniz sessions birim testinde kilitliydi; akis duzeyinde de kilitle.
+  it("acik akis oturumu CANLI TUTMAZ: yeniden dogrulama last_seen_at'i guncellemez", async () => {
+    await addUser(k, "touch@example.com", PW, "viewer");
+    const c = await loginAs(k, "touch@example.com", PW);
+    const t0 = k.clock.now;
+    const seenBefore = (await k.db.pool.query("SELECT last_seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.email='touch@example.com'")).rows[0].last_seen_at as Date;
+    const s = await openStream(c);
+    try {
+      await waitFor(() => s.events.some((e) => e.event === "ready"), 2000, "ready");
+      k.clock.now = new Date(t0.getTime() + 20 * 60_000); // 20 dk sonra (bosta siniri 30 dk): oturum hala gecerli
+      await sleep(700); // >= 4 yeniden dogrulama
+      expect(s.ended).toBe(false);
+      const seenAfter = (await k.db.pool.query("SELECT last_seen_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.email='touch@example.com'")).rows[0].last_seen_at as Date;
+      expect(seenAfter.getTime()).toBe(seenBefore.getTime()); // dokunulmadi
+    } finally { s.close(); k.clock.now = t0; }
+  });
+
   it("devre disi birakilan kullanicinin akisi kapanir", async () => {
     const c = await loginAs(k, "a2@example.com", PW);
     const s = await openStream(c);

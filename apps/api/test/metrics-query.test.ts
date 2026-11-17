@@ -116,6 +116,28 @@ describe("GET /api/v1/devices/:id/metrics", () => {
     }
   });
 
+  // M-4a (inceleme): ham sorgu kurali yalniz "aralik <= 3 sa ve from >= now-3 gun"; 12 sa sonrasi SIKISTIRILMIS ham chunk'lar da okunabilir.
+  it("12 saatten eski, SIKISTIRILMIS ham chunk'taki aralik dogru okunur (ham kaynak)", async () => {
+    const base = new Date(Math.floor((T.getTime() - 20 * HOUR) / MIN) * MIN);
+    await k.db.pool.query(
+      `INSERT INTO metric_samples (ts, org_id, device_id, metric, value)
+       SELECT t, $1, $2, 'cmp.raw', 10 + (extract(epoch from t)::bigint % 5)
+         FROM generate_series($3::timestamptz, $4::timestamptz, interval '5 seconds') t`,
+      [k.org, devA, base, new Date(base.getTime() + 20 * MIN)]);
+    for (const c of (await k.db.pool.query("SELECT show_chunks('metric_samples', older_than => now() - interval '13 hours') AS c")).rows) {
+      try { await k.db.pool.query("SELECT compress_chunk($1::regclass, if_not_compressed => true)", [c.c]); }
+      catch (e) { if (!/already compressed/.test((e as Error).message)) throw e; }
+    }
+    const nCompressed = Number((await k.db.pool.query("SELECT count(*) FROM timescaledb_information.chunks WHERE hypertable_name='metric_samples' AND is_compressed")).rows[0].count);
+    expect(nCompressed).toBeGreaterThan(0);
+    const r = await api(k, "GET", url(devA, { metric: "cmp.raw", from: iso(base), to: iso(new Date(base.getTime() + 20 * MIN)), max_points: 20 }), { cookie });
+    expect(r.statusCode).toBe(200);
+    const j = r.json();
+    expect(j.source).toBe("raw");
+    expect(j.points.length).toBeGreaterThan(10);
+    for (const p of j.points) { expect(p.min).toBeGreaterThanOrEqual(10); expect(p.max).toBeLessThanOrEqual(14); }
+  });
+
   it("veri olmayan aralik ve olmayan metrik: points bos dizi (hata degil, sahte nokta yok)", async () => {
     const empty = await api(k, "GET", url(devA, { metric: "cpu.total", from: iso(new Date(T.getTime() - 40 * DAY)), to: iso(new Date(T.getTime() - 39 * DAY)) }), { cookie });
     expect(empty.statusCode).toBe(200);

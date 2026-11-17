@@ -150,7 +150,25 @@ describe("giris, cikis, me", () => {
   });
 });
 
+describe("giris: IP metni", () => {
+  it("bolge kimlikli link-local IPv6 istemciyle giris 500 vermez (M-1)", async () => {
+    await addUser(k, "zone@example.com", PW, "viewer");
+    const r = await k.app.inject({ method: "POST", url: "/api/v1/login", remoteAddress: "fe80::1%eth0",
+      headers: { "content-type": "application/json", origin: "https://panel.example.test" }, payload: JSON.stringify({ email: "zone@example.com", password: PW }) });
+    expect(r.statusCode).toBe(200);
+  });
+});
+
 describe("giris hiz siniri", () => {
+  it("IP basina toplam sinir (loginPerIp): farkli e-postalarla puskurtme 4. denemede 429 (M-2: mutasyon kilidi)", async () => {
+    const kk = await setupKit({ limits: { loginPerIp: 3, loginPerKey: 1000, enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000 } });
+    try {
+      const codes: number[] = [];
+      for (let i = 0; i < 4; i++) codes.push((await api(kk, "POST", "/api/v1/login", { body: { email: `kisi${i}@example.com`, password: "yanlis-parola-123" } })).statusCode);
+      expect(codes).toEqual([401, 401, 401, 429]);
+    } finally { await kk.close(); }
+  });
+
   it("ayni IP+e-posta icin 4. hizli deneme 429 (Retry-After ile); baska e-posta etkilenmez", async () => {
     const kk = await setupKit({ limits: { loginPerKey: 3, loginPerIp: 1000, enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000 } });
     try {

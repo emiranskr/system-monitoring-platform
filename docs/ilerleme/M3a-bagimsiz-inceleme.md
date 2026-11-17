@@ -1,5 +1,7 @@
 # M3a bağımsız inceleme (2026-11-15) — `caea950..52648e3`
 
+> **2026-11-17 DÜZELTME DURUMU:** I-1 (`12dfb72`), I-2 (`c121e76`) düzeltildi, regresyon testleri kırmızı→yeşil; M-1, M-2 (2 mutasyon artık yakalanıyor), M-4 (a: test, b–e: M3a.md) yapıldı; M-3 bilinçli ertelendi (M3a.md). Dar yeniden inceleme ve ChatGPT onayı bekliyor. Aşağıdaki metin ilk inceleme kaydıdır.
+
 **Sonuç: RET.** Critical 0, **Important 2**, Minor 4, Informational. Kabul ölçütü: Important = 0. Kod değiştirilmedi; düzeltmeler 2026-11-16 işi.
 
 ## Important (kapanmadan kabul yok)

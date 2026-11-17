@@ -36,7 +36,12 @@ Tarih: 2026-11-15. Dal: `feat/m3a-backend` (taban `feat/m1-agent` @ `caea950`). 
 - Giriş için ek `loginPerIp` (60/dk) ve `setupPerIp` (10/dk) sınırlayıcıları (planda yalnız IP+e-posta vardı).
 - Oturum yeniden doğrulaması (SSE) `touch:false`: açık akış 30 dk boşta kuralını geçersiz kılmaz; SPA sayfayı canlı tutmak için `/api/v1/me`'yi periyodik çağırmalıdır (M3b).
 - Setup token `process.stderr`'e yazılır (yapılandırılmış günlüğe değil; ChatGPT kararı, proposal §10.6'daki "günlüğe yazılır"ın yerine geçer).
-- Metrik sorgusunda ham veri yalnız `to-from ≤ 3 sa` ve `from ≥ now-3 gün` için; ham veri sıkıştırması (12 sa sonrası) bu kural sayesinde ham sorguya girmez, bu yüzden "sıkıştırılmış ham aralık" testi anlamsız kaldı (plandan çıkarıldı).
+- Metrik sorgusunda ham veri yalnız `to-from ≤ 3 sa` ve `from ≥ now-3 gün` için okunur. **DÜZELTME (inceleme M-4a):** önceki sürümdeki "12 sa sonrası sıkıştırılmış ham chunk ham sorguya girmez" ifadesi YANLIŞTI; 12 sa–3 gün arasındaki sıkıştırılmış ham chunk'lar da bu kuralla sorgulanabilir. Bu yol artık testli (`metrics-query.test.ts`, sıkıştırılmış chunk'ta doğru sonuç).
+- **Cihaz durumu eşiği:** çevrimiçi sınırı `max(30 sn, 6 × örnekleme aralığı)` (planda 3× yazıyordu; 6× benim kararım, agent batch'i araya girdiğinde gereksiz "bayat" göstermemek için).
+- **Org izolasyonu uygulaması:** tasarım §10.5'teki "OrgContext + ham havuz dışa verilmez" kuralı bu işte UYGULANMADI: handler'lar `pool.query`'yi doğrudan çağırır ve her sorgu elle `orgId` (oturumdan) geçirir; koruma, otomatik rota-kapsam testi + IDOR paketi + mutasyon denemeleridir. Yapısal (OrgContext) çözüm M6 sertleştirme adayı.
+- **Linux/CI:** `@node-rs/argon2` ikilisinin Linux'ta çalıştığı bu işte DOĞRULANMADI (yalnız yerel Windows). Lock dosyasında platform ikilileri var; ilk push sonrası CI'da doğrulanmalı (ChatGPT şartı açık).
+- **Bench notu:** geçmiş verisi dakikada 1 örnek (n=1/kova) olduğundan n-ağırlıklı ortalama bench'te değil birim testinde doğrulanır; betiğin ürettiği ham satır (~3,0 M) ile ölçülen (2,56 M) arasındaki fark (muhtemelen saklama işi) doğrulanmadı.
+- **Ertelenen (inceleme M-3):** her başarısız giriş `audit_events` satırı yazar (saklama politikası yok) ve süresi dolmuş hiç kullanılmamış `sessions` satırları yalnız erişimde silinir (temizleme işi yok): büyüme yavaş ama sınırsız; saklama/temizleme işi M6 sertleştirmeye bırakıldı.
 - `registeredRoutes` süsleyicisi yalnız IDOR kapsam testi için (`onRoute` kancası; çalışma zamanı maliyeti yok).
 
 ## 4. Düzeltmeler / yan bulgular

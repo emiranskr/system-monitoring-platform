@@ -103,6 +103,16 @@ describe("oturumlar", () => {
     expect(await resolveSession(db.pool, s.id, at(MIN), cfg)).toBeNull();
   });
 
+  // M-1 (inceleme): bolge kimlikli link-local IPv6 (fe80::1%eth0) `inet` sutununa yazilamaz -> giris 500 olurdu.
+  it("IP adresi bolge kimligi (%eth0) tasisa da oturum olusur; gecersiz IP metni null saklanir", async () => {
+    const a = await createSession(db.pool, { id: user, orgId: org }, T0, cfg, { ip: "fe80::1%eth0", ua: "t" });
+    const b = await createSession(db.pool, { id: user, orgId: org }, T0, cfg, { ip: "bu-bir-ip-degil", ua: "t" });
+    expect(await resolveSession(db.pool, a.id, at(MIN), cfg)).not.toBeNull();
+    expect(await resolveSession(db.pool, b.id, at(MIN), cfg)).not.toBeNull();
+    const ips = (await db.pool.query("SELECT host(ip) AS ip FROM sessions ORDER BY created_at, id_hash")).rows.map((r) => r.ip);
+    expect(ips.sort((x, y) => String(x).localeCompare(String(y)))).toEqual([null, "fe80::1"].sort((x, y) => String(x).localeCompare(String(y))));
+  });
+
   it("her oturum benzersiz kimlik alir", async () => {
     const ids = new Set((await Promise.all(Array.from({ length: 20 }, () => make()))).map((s) => s.id));
     expect(ids.size).toBe(20);
