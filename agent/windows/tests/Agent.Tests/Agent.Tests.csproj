@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\Agent.Collectors\Agent.Collectors.csproj" />
     <ProjectReference Include="..\..\src\Agent.Transport\Agent.Transport.csproj" />
     <ProjectReference Include="..\..\src\Agent.Hardware\Agent.Hardware.csproj" />
+    <ProjectReference Include="..\..\src\Agent.Sensors\Agent.Sensors.csproj" />
   </ItemGroup>
 
   <ItemGroup>
