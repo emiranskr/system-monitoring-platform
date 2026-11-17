@@ -9,7 +9,7 @@ Tarih: 2026-11-17 (devam ediyor). Dal: `feat/m3b-web` (taban `feat/m1-agent` @ `
 | G2 Backend `metric-names` + sözleşme testleri (tüm yanıtlar şemayla, SSE gövdesi dahil) | **Tamam** `5c522da` | api 273 test; 3 mutasyon yakalandı, `ORDER BY` mutasyonu bu ortamda EŞDEĞER (kolasyon C + planlayıcı sıralı gruplama) — sıralama garantisi sorguda duruyor |
 | G3 `apps/web` iskeleti (Vite 8, React 19, Tailwind v4, Inter, tokenlar, kontrast + ham-HTML-yasağı testleri) | **Tamam** `2454e5c` | web 12 test; lisans 218 paket 0 izinsiz |
 | G4 API istemcisi + oturum + Giriş | **Tamam** `8eebf1f` | web 48 test; mutasyonlar: sözleşme doğrulaması, keep-alive görünürlük, login-401 ayrımı yakalandı; safeNext `//` kontrolü EŞDEĞER (URL kökeni kontrolü aynı girdiyi reddediyor, bilinçli savunma derinliği) |
-| G5 Genel bakış + Cihaz listesi | Bekliyor | |
+| G5 Genel bakış + Cihaz listesi + kabuk | **Tamam** `e532f66` | web 89 test; Türkçe i/I/ı/İ arama katlaması testle bulundu; NULL-sona mutasyonu yakalandı; **karar:** mobilde kart yerine sütun azaltma (Bellek/Disk gizlenir) |
 | G6 Cihaz detayı + grafikler | Bekliyor | |
 | G7 "Cihaz ekle" | Bekliyor | |
 | G8 SSE istemcisi | Bekliyor | |
