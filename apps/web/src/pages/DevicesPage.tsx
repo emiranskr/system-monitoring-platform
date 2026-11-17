@@ -99,7 +99,7 @@ export function DevicesPage() {
             <tbody>
               {rows.map((d) => (
                 <tr key={d.id} className="border-t border-border">
-                  <td className="max-w-40 px-3 py-2 sm:max-w-64"><Link to={`/cihaz/${d.id}`} className="block truncate text-accent hover:underline">{d.name}</Link></td>
+                  <td className="max-w-40 px-3 py-2 sm:max-w-64"><Link to={`/cihaz/${d.id}`} className="flex min-h-11 items-center text-accent hover:underline"><span className="truncate">{d.name}</span></Link></td>
                   <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
                   <td className="px-3 py-2 tabular-nums">{formatPct(d.cpu_pct)}</td>
                   <td className="hidden px-3 py-2 tabular-nums sm:table-cell">{formatPct(d.mem_pct)}</td>

@@ -47,8 +47,8 @@ test.describe("giris ve oturum", () => {
   });
 
   test("oturum veritabanindan SILININCE arayuz sonraki sorguda (yoklama <= 15 sn) girise doner", async ({ page }) => {
-    await login(page, USERS.viewer);
-    await sql("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email=$1)", [USERS.viewer]);
+    await login(page, USERS.revoke); // ortak storageState oturumlarini etkilememek icin ayri kullanici
+    await sql("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email=$1)", [USERS.revoke]);
     // Onbellekteki taze veri aninda gosterilir; oturum kaybi bir sonraki /devices yoklamasinda (401) fark edilir.
     await page.getByRole("link", { name: "Cihazlar" }).click();
     await expect(page).toHaveURL(/\/giris/, { timeout: 25_000 });

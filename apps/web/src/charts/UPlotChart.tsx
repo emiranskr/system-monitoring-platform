@@ -59,5 +59,7 @@ export function UPlotChart({ data, label, format, height = 220 }: UPlotChartProp
     return () => cancelAnimationFrame(id);
   }, [data]);
 
-  return <div ref={host} role="img" aria-label={label} className="w-full overflow-hidden" />;
+  // data-gaps: veri dizisindeki KESINTI (null) sayisi — E2E ve hata ayiklama icin (gorunur davranis degil)
+  const gaps = data.avg.filter((v) => v === null).length;
+  return <div ref={host} role="img" aria-label={label} data-gaps={gaps} className="w-full overflow-hidden" />;
 }

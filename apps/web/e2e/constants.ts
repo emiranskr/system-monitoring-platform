@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 /** E2E sabitleri. Parolalar YALNIZ bu testin gecici veritabani icin uretilmis TEST degerleridir (gercek hesaba ait degil). */
 export const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 5199);
 export const API_PORT = Number(process.env.E2E_API_PORT ?? 18599);
@@ -10,7 +12,12 @@ export const USERS = {
   admin: "admin@example.com",
   viewer: "viewer@example.com",
   orgB: "b-owner@example.com",
+  /** Oturumu testte VERITABANINDAN silinen kullanici (ortak storageState oturumlarini etkilemesin). */
+  revoke: "revoke@example.com",
 } as const;
+
+/** Playwright storageState dosyasi (global-setup bir kez giris yapip yazar; testler tekrar giris yapmaz: hiz sinirina takilmaz). */
+export const authFile = (u: "owner" | "admin" | "viewer") => fileURLToPath(new URL(`./.auth/${u}.json`, import.meta.url));
 
 /** Veri tohumu: cihaz adlari (testler bunlara gore dogrular). */
 export const DEVICES = {

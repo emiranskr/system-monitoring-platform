@@ -13,3 +13,4 @@ TestResults/
 apps/web/test-results/
 apps/web/playwright-report/
 apps/web/e2e/.state.json
+apps/web/e2e/.auth/

@@ -16,7 +16,7 @@ function TopList({ title, devices, pick }: { title: string; devices: DeviceSumma
         <ol className="space-y-1">
           {devices.map((d) => (
             <li key={d.id} className="flex items-baseline justify-between gap-3">
-              <Link to={`/cihaz/${d.id}`} className="min-w-0 truncate text-accent hover:underline">{d.name}</Link>
+              <Link to={`/cihaz/${d.id}`} className="flex min-h-11 min-w-0 items-center text-accent hover:underline"><span className="truncate">{d.name}</span></Link>
               <span className="tabular-nums">{formatPct(pick(d))}</span>
             </li>
           ))}

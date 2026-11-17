@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
-import { API_ORIGIN, API_PORT, DEVICES, E2E_PASSWORD, STATE_FILE, USERS, WEB_ORIGIN, WEB_PORT, type E2EState } from "./constants";
+import { API_ORIGIN, API_PORT, DEVICES, E2E_PASSWORD, STATE_FILE, USERS, WEB_ORIGIN, WEB_PORT, authFile, type E2EState } from "./constants";
 import { createTestDb } from "../../../packages/db/dist/testing.js";
 import { hashPassword } from "../../api/dist/password.js";
 
@@ -73,8 +73,8 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     const orgId = (await q("SELECT org_id FROM users WHERE email=$1", [USERS.owner])).rows[0].org_id as string;
     const orgBId = (await q("INSERT INTO orgs (name) VALUES ('org-b') RETURNING id")).rows[0].id as string;
     const hash = await hashPassword(E2E_PASSWORD);
-    await q("INSERT INTO users (org_id, email, password_hash, role) VALUES ($1,$2,$3,'admin'), ($1,$4,$3,'viewer'), ($5,$6,$3,'owner')",
-      [orgId, USERS.admin, hash, USERS.viewer, orgBId, USERS.orgB]);
+    await q("INSERT INTO users (org_id, email, password_hash, role) VALUES ($1,$2,$3,'admin'), ($1,$4,$3,'viewer'), ($5,$6,$3,'owner'), ($1,$7,$3,'viewer')",
+      [orgId, USERS.admin, hash, USERS.viewer, orgBId, USERS.orgB, USERS.revoke]);
 
     // --- cihazlar ---
     const info = (hostname: string) => JSON.stringify({ hostname, os: "Windows 11", agent_version: "0.1.0", gpus: [], adapters: [{ id: "eth0", name: "Ethernet" }], volumes: [{ id: "C", name: "C:" }] });
@@ -124,6 +124,19 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     };
     await tick();
     keepAlive = setInterval(() => void tick(), 4000);
+
+    // --- Oturum durumlari (storageState): her rol icin BIR kez giris; testler tekrar giris yapmaz (giris hiz sinirina takilmaz) ---
+    for (const [role, email] of [["owner", USERS.owner], ["admin", USERS.admin], ["viewer", USERS.viewer]] as const) {
+      const r = await fetch(`${API_ORIGIN}/api/v1/login`, {
+        method: "POST", headers: { "content-type": "application/json", origin: WEB_ORIGIN }, body: JSON.stringify({ email, password: E2E_PASSWORD }),
+      });
+      if (r.status !== 200) throw new Error(`${role} girisi basarisiz: ${r.status}`);
+      const sid = /__Host-sid=([^;]+)/.exec(r.headers.get("set-cookie") ?? "")?.[1];
+      if (!sid) throw new Error(`${role}: oturum cerezi alinamadi`);
+      const file = authFile(role);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, JSON.stringify({ cookies: [{ name: "__Host-sid", value: sid, domain: "localhost", path: "/", expires: -1, httpOnly: true, secure: true, sameSite: "Lax" }], origins: [] }));
+    }
 
     // --- Vite (ayni koken proxy) ---
     const viteBin = join(dirname(createRequire(join(webDir, "package.json")).resolve("vite/package.json")), "bin/vite.js");
