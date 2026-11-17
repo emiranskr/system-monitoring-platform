@@ -55,6 +55,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     expire();
   }, [expire]);
 
+  // Herhangi bir sorgu 401 (oturum) alirsa oturum yerel olarak da dusurulur -> RequireAuth girise yonlendirir.
+  useEffect(() => qc.getQueryCache().subscribe((ev) => {
+    if (ev.type === "updated" && ev.action.type === "error" && ev.action.error instanceof SessionExpiredError) expire();
+  }), [qc, expire]);
+
   useKeepAlive(expire, status === "authed");
 
   const value = useMemo<SessionValue>(() => ({ user, status, error, login, logout, expire }), [user, status, error, login, logout, expire]);

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -23,10 +23,19 @@ describe("uygulama", () => {
     expect(await screen.findByRole("heading", { name: "Giriş" })).toBeInTheDocument();
   });
 
-  it("oturumlu '/' ana basligi gosterir", async () => {
-    mockFetch({ "GET /api/v1/me": () => ({ status: 200, body: { email: "a@example.com", role: "viewer" } }) });
+  it("oturumlu '/' kabuk (gezinme, kullanici, cikis) + Genel bakis gosterir", async () => {
+    mockFetch({
+      "GET /api/v1/me": () => ({ status: 200, body: { email: "a@example.com", role: "viewer" } }),
+      "GET /api/v1/devices": () => ({ status: 200, body: { devices: [] } }),
+    });
     renderApp("/");
-    expect(await screen.findByRole("heading", { level: 1, name: "Sistem İzleme" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Genel bakış" })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Ana gezinme" });
+    expect(within(nav).getByRole("link", { name: "Cihazlar" })).toHaveAttribute("href", "/cihazlar");
+    expect(screen.getByText("a@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Çıkış" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "İçeriğe geç" })).toHaveAttribute("href", "#icerik");
+    expect(screen.getByRole("main")).toHaveAttribute("id", "icerik");
   });
 
   it("bilinmeyen yol 'Sayfa bulunamadi'", async () => {
