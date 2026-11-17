@@ -1,8 +1,14 @@
-/** Kok bilesen. Yonlendirme, oturum ve veri katmani sonraki gorevlerde eklenir (G4+). */
+import { Route, Routes } from "react-router-dom";
+import { LoginPage } from "./pages/LoginPage";
+import { RequireAuth } from "./session/RequireAuth";
+
+/** Yonlendirme tablosu. Saglayicilar (QueryClient, Router, Session) main.tsx'te / testlerde dissaldan verilir. */
 export function App() {
   return (
-    <main className="min-h-screen bg-surface-0 text-text-primary">
-      <h1 className="p-6 text-xl font-semibold">Sistem İzleme</h1>
-    </main>
+    <Routes>
+      <Route path="/giris" element={<LoginPage />} />
+      <Route path="/" element={<RequireAuth><main className="p-6"><h1 className="text-xl font-semibold">Sistem İzleme</h1></main></RequireAuth>} />
+      <Route path="*" element={<main className="p-6"><h1 className="text-xl font-semibold">Sayfa bulunamadı</h1></main>} />
+    </Routes>
   );
 }
