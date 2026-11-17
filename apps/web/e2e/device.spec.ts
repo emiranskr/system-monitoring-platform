@@ -10,7 +10,7 @@ test.describe("cihaz detayi ve grafikler (gercek veri, gercek uPlot)", () => {
     await page.goto(`/cihaz/${state().devices.online.id}`);
     await expect(page.getByRole("heading", { level: 1, name: DEVICES.online })).toBeVisible();
     await expect(page.getByText("Çevrimiçi").first()).toBeVisible();
-    await expect(page.getByRole("tablist", { name: "Cihaz bölümleri" }).getByRole("tab")).toHaveText(["Genel", "CPU", "Bellek", "Depolama", "Ağ", "Bilgi"]);
+    await expect(page.getByRole("tablist", { name: "Cihaz bölümleri" }).getByRole("tab")).toHaveText(["Genel", "CPU", "Bellek", "Depolama", "GPU", "Ağ", "Bilgi"]);
     const cpu = page.getByRole("img", { name: "CPU kullanımı" });
     await expect(cpu.locator("canvas").first()).toBeVisible(); // uPlot GERCEKTEN canvas cizdi
     await expect(page.getByRole("img", { name: "Bellek kullanımı" }).locator("canvas").first()).toBeVisible();
@@ -59,6 +59,23 @@ test.describe("cihaz detayi ve grafikler (gercek veri, gercek uPlot)", () => {
     await page.goto(`/cihaz/${state().devices.online.id}`);
     await expect(page.getByRole("img", { name: "CPU kullanımı" }).locator("canvas").first()).toBeVisible();
     await expect(page.getByRole("img", { name: "CPU kullanımı" })).toHaveAttribute("data-gaps", "0");
+  });
+
+  test("GPU sekmesi: gercek backend verisiyle kimlik basina baslik ve grafikler; GPU'su olmayan cihazda 'Bu donanimda yok'", async ({ page }) => {
+    await open(page, "/");
+    await page.goto(`/cihaz/${state().devices.online.id}`);
+    await page.getByRole("tab", { name: "GPU" }).click();
+    await expect(page.getByRole("heading", { name: "GPU 46139694" })).toBeVisible();
+    for (const t of ["kullanım", "VRAM kullanımı", "sıcaklık"]) {
+      const r = page.getByRole("region", { name: `GPU 46139694: ${t}` });
+      await expect(r.locator("canvas").first()).toBeVisible();
+    }
+    await expect(page.getByRole("img", { name: "GPU 46139694: sıcaklık" }).locator("..").getByText(/°C/).first()).toBeVisible();
+    await expect(page.getByRole("img", { name: "GPU 46139694: fan hızı" })).toHaveCount(0); // seride olmayan alan
+
+    await page.goto(`/cihaz/${state().devices.gap.id}`);
+    await page.getByRole("tab", { name: "GPU" }).click();
+    await expect(page.getByText(/bu donanımda yok/i)).toBeVisible();
   });
 
   test("Ag sekmesi: adaptor adi device_info'dan, KB/s biriminde ozet; Depolama: disk grafigi", async ({ page }) => {

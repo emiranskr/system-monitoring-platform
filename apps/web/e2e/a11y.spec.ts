@@ -81,7 +81,7 @@ test.describe("erisilebilirlik (axe): oturumlu ekranlar", () => {
     await expect(trigger).toBeFocused();
   });
 
-  for (const tab of ["Genel", "CPU", "Bellek", "Depolama", "Ağ", "Bilgi"]) {
+  for (const tab of ["Genel", "CPU", "Bellek", "Depolama", "GPU", "Ağ", "Bilgi"]) {
     test(`cihaz detayi: ${tab} sekmesi`, async ({ page }) => {
       await open(page, `/cihaz/${state().devices.online.id}`);
       await page.getByRole("tab", { name: tab }).click();

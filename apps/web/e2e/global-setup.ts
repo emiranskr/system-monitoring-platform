@@ -105,7 +105,9 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
            FROM generate_series($3::timestamptz, $4::timestamptz, make_interval(secs => $5::float8)) t, unnest($6::text[]) m
           WHERE $7::timestamptz IS NULL OR NOT (t >= $7::timestamptz AND t < $8::timestamptz)`,
         [org, dev, from, to, stepSec, metrics, holeFrom ?? null, holeTo ?? null]);
-    const M = ["cpu.total", "mem.used_pct", "disk.c.used_pct", "net.eth0.rx_bps", "net.eth0.tx_bps"];
+    const GPU_ID = "gpu-46139694-b075-6c98-9b95-3b6f3a465823"; // NVML UUID tabanli CanonicalId (M4)
+    const M = ["cpu.total", "mem.used_pct", "disk.c.used_pct", "net.eth0.rx_bps", "net.eth0.tx_bps",
+      `gpu.${GPU_ID}.util_pct`, `gpu.${GPU_ID}.vram_used_bytes`, `gpu.${GPU_ID}.temp_c`];
     await seed(devices.online.id, orgId, M, new Date(T.getTime() - 3 * hour), new Date(now - 5000), 5);          // son 3 sa, 5 sn (ham)
     await seed(devices.online.id, orgId, M, new Date(T.getTime() - 26 * hour), new Date(T.getTime() - 3 * hour - minute), 60); // 1 dk katman gecmisi
     await seed(devices.gap.id, orgId, ["cpu.total", "mem.used_pct"], new Date(T.getTime() - 3 * hour), new Date(now - 5000), 5,

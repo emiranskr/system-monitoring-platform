@@ -21,7 +21,7 @@ test("yatay tasma yok: genel bakis, liste, detay (tum sekmeler), giris", async (
   await expect(page.getByRole("table")).toBeVisible();
   await noOverflow(page, "liste");
   await open(page, `/cihaz/${state().devices.online.id}`);
-  for (const tab of ["Genel", "CPU", "Bellek", "Depolama", "Ağ", "Bilgi"]) {
+  for (const tab of ["Genel", "CPU", "Bellek", "Depolama", "GPU", "Ağ", "Bilgi"]) {
     await page.getByRole("tab", { name: tab }).click();
     if (tab !== "Bilgi") await expect(page.locator("canvas").first()).toBeVisible();
     await noOverflow(page, `detay/${tab}`);
