@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { MeSchema } from "@sysmon/protocol";
 import { apiFetch, SessionExpiredError } from "../api/client";
+import { usePolling } from "../api/usePolling";
 import { useSession } from "../session/SessionProvider";
 import { applyEvent } from "./applyEvent";
 import { createLiveClient, type LiveStatus } from "./liveClient";
@@ -22,6 +23,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const session = useSession();
   const [state, setState] = useState<LiveState>("off");
+  usePolling(); // sabit zamanlayici: SSE onbellek yazimlari yoklamayi sifirlayamaz
 
   useEffect(() => {
     const ES = (globalThis as { EventSource?: typeof EventSource }).EventSource;

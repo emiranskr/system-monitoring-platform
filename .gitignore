@@ -8,3 +8,8 @@ obj/
 coverage/
 
 TestResults/
+
+# Playwright E2E (apps/web)
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/e2e/.state.json

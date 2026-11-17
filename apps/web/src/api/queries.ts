@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { DevicesResponseSchema } from "@sysmon/protocol";
 import { apiFetch } from "./client";
 
-/** Canli baglanti yokken (veya SSE ile birlikte emniyet olarak) yoklama araligi. */
+/** Yoklama araligi (usePolling): SSE varken de calisir, cunku cihazin sessizce cevrimdisi olmasi SSE olayi uretmez. */
 export const POLL_MS = 15_000;
 
 export const queryKeys = {
@@ -13,6 +13,5 @@ export function useDevices() {
   return useQuery({
     queryKey: queryKeys.devices,
     queryFn: ({ signal }) => apiFetch("/api/v1/devices", DevicesResponseSchema, { signal }),
-    refetchInterval: POLL_MS,
   });
 }
