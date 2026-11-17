@@ -8,7 +8,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "gen:openapi": "pnpm build && node scripts/gen-openapi.mjs"
   },
   "dependencies": {
     "zod": "^4.6.7"
