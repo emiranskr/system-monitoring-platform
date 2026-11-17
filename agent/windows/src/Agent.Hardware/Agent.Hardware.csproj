@@ -9,4 +9,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Agent.Collectors\Agent.Collectors.csproj" />
+  </ItemGroup>
+
 </Project>

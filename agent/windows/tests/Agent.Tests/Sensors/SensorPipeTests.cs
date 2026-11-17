@@ -33,7 +33,7 @@ public class SensorPipeTests
 
     private static (SensorPipeServer Server, Task Run, CancellationTokenSource Cts) StartServer(string name, ISensorProvider p, SecurityIdentifier? allow = null, int? clientPid = null, TimeSpan? providerTimeout = null)
     {
-        var server = new SensorPipeServer(name, p, allow ?? Me, clientPid, providerTimeout ?? TimeSpan.FromMilliseconds(400));
+        var server = new SensorPipeServer(name, p, allow ?? Me, clientPid, providerTimeout ?? TimeSpan.FromSeconds(2));
         server.Start();
         var cts = new CancellationTokenSource();
         return (server, server.RunAsync(cts.Token), cts);

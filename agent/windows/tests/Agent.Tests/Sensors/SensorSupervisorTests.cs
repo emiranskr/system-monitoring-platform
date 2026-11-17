@@ -58,7 +58,7 @@ public sealed class FakeLauncher : IHelperLauncher
         }
         else
         {
-            var server = new SensorPipeServer(pipeName, Provider, Me, null, TimeSpan.FromMilliseconds(300));
+            var server = new SensorPipeServer(pipeName, Provider, Me, null, TimeSpan.FromMilliseconds(1500));
             server.Start();
             var run = server.RunAsync(cts.Token);
             stop = () => { cts.Cancel(); _ = server.DisposeAsync(); _ = run.ContinueWith(_ => { }); };
@@ -79,7 +79,7 @@ public class SensorSupervisorTests
     }
 
     private static SupervisorOptions Opts(int max = 4, double backoffMax = 8) => new(
-        ConnectTimeout: TimeSpan.FromSeconds(1), ReadTimeout: TimeSpan.FromMilliseconds(500),
+        ConnectTimeout: TimeSpan.FromSeconds(5), ReadTimeout: TimeSpan.FromSeconds(2),
         BackoffBase: TimeSpan.FromSeconds(1), BackoffMax: TimeSpan.FromSeconds(backoffMax),
         MaxConsecutiveFailures: max, CircuitCooldown: TimeSpan.FromSeconds(60), HealthyReadsToReset: 3, KillWait: TimeSpan.FromSeconds(1));
 

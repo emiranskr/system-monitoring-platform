@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SysMon.Agent.Collectors;
+using SysMon.Agent.Hardware;
+using SysMon.Agent.Hardware.Nvml;
 using SysMon.Agent.Transport;
 
 namespace SysMon.Agent;
@@ -38,12 +40,16 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
             onDropped: n => log.LogWarning("Spool boyutu veya yas siniri asildi: {Count} eski batch atildi.", n));
 
         using var cpu = new PdhCpuSource();
+        // GPU (M4): NVML salt okunur, standart hesapla calisir; surucu/DLL yoksa sonuc bos olur ve diger metrikler surer.
+        using var nvmlApi = new NvmlNativeApi();
+        using var nvml = new NvmlGpuProvider(nvmlApi);
         var runner = new CollectorRunner(
         [
             new CpuCollector(cpu),
             new MemoryCollector(new WindowsMemoryInfoSource()),
             new DiskCollector(new SystemDriveSource()),
             new NetworkCollector(new SystemNetworkSource(), () => Environment.TickCount64),
+            new GpuCollector([nvml], TimeSpan.FromSeconds(5), readTimeout: TimeSpan.FromSeconds(1), rediscoveryInterval: TimeSpan.FromSeconds(60)),
         ], TimeSpan.FromSeconds(2));
 
         SamplingPipeline? pipeline = null;

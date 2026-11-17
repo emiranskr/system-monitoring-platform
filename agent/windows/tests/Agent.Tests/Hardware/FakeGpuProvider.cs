@@ -15,11 +15,15 @@ public sealed class FakeGpuProvider(string id, int priority, IReadOnlyList<GpuDe
     public bool IgnoreToken { get; set; }
     public Exception? ThrowOnRead { get; set; }
 
+    private int _discoverCalls;
+    public int DiscoverCalls => _discoverCalls;
+
     public bool IsAvailable() => Available;
 
     public Task<IReadOnlyList<GpuDevice>> DiscoverAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        Interlocked.Increment(ref _discoverCalls);
         return Task.FromResult<IReadOnlyList<GpuDevice>>(Available ? Devices : []);
     }
 

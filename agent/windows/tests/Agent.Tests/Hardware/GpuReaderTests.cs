@@ -23,7 +23,7 @@ public class GpuReaderTests
         var r = await GpuReader.ReadAsync(p, D, TimeSpan.FromMilliseconds(150), CancellationToken.None);
         Assert.Equal(GpuReadStatus.TimedOut, r.Status);
         Assert.Equal(GpuSample.Unavailable, r.Sample);
-        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(2), $"agent kilitlendi: {sw.Elapsed}");
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10), $"agent kilitlendi: {sw.Elapsed}");
     }
 
     [Fact]

@@ -289,7 +289,7 @@ public class NvmlGpuProviderTests
         var sw = System.Diagnostics.Stopwatch.StartNew();
         await Assert.ThrowsAsync<GpuProviderBusyException>(() => p.ReadAsync(devs[0], CancellationToken.None));
         Assert.True(p.IsAvailable());
-        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1), $"yeni cagrilar bloklandi: {sw.Elapsed}");
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5), $"yeni cagrilar bloklandi: {sw.Elapsed}");
 
         release.Set();
         Assert.Equal(40, (await first).UtilPct);

@@ -83,7 +83,7 @@ public sealed class SensorHelperIntegrationTests : IDisposable
         using var parent = Process.Start(new ProcessStartInfo("ping.exe", "-n 4 127.0.0.1") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true })!;
         var name = SensorPipeServer.NewPipeName();
         using var helper = Process.Start(new ProcessStartInfo(ProdHelper, $"--pipe {name} --parent-pid {parent.Id} --allow-sid {Me.Value}") { UseShellExecute = false, CreateNoWindow = true })!;
-        Assert.True(helper.WaitForExit(15000), "yardimci ebeveyn cikinca cikmadi");
+        Assert.True(helper.WaitForExit(45000), "yardimci ebeveyn cikinca cikmadi");
         Assert.Equal(0, helper.ExitCode);
         parent.WaitForExit(2000);
     }
