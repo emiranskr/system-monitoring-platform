@@ -29,3 +29,8 @@ Tarih: 2026-11-17. Durum: **TASLAK / kısmi**. ChatGPT kararı: G0 yalnız bu ma
 - GPU'suz VM'de PDH/NVML davranışı: **doğrulanmadı** (beklenti: NVML yok → zarif düşüş; testle sahte sağlayıcıyla kapsanır).
 - Hangi LHM sürümü hangi sürücüyü kullanıyor, SMBus/mutex çakışması: **ölçülmedi**.
 - PDH LUID ↔ NVML UUID eşlemesi, WDDM'de süreç başına sorgu sınırı: G1/G2'de.
+
+## Ek (G2 sırasında, 2026-11-17): gerçek NVML ölçümü
+- **NVML standart kullanıcıyla çalışıyor:** `nvml.dll` (System32) yönetici olmadan yüklenir; init, cihaz sayısı, UUID/ad, kullanım, bellek, sıcaklık okundu (`RealNvmlTests`, `[Trait("Category","RealHardware")]`, nvidia-smi yoksa açıkça atlanır).
+- **Bellek tuzağı:** `nvmlDeviceGetMemoryInfo` (v1) `used` değeri **ayrılmış (reserved) belleği içerir** (bu makinede 753 MiB + 284 MiB reserved = 1037 MiB); nvidia-smi `memory.used` ayrılmışı hariç tutar. Kabul ölçütü smi eşliği (±50 MB) olduğundan `nvmlDeviceGetMemoryInfo_v2` kullanılır, export yoksa/hata verirse v1'e düşülür (bu durumda `used` ayrılmışı da içerir; eski sürücülerde kabul edilmiş sapma).
+- NVML UUID ↔ PDH LUID eşlemesi hâlâ çözülmedi (PDH sağlayıcısı M4 kapsamında değil; NVML birincil).

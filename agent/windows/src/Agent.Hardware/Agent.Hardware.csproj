@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>SysMon.Agent.Hardware</RootNamespace>
+    <!-- NVML icin yalnizca NvmlNativeApi icinde fonksiyon isaretcileri kullanilir -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
 </Project>
