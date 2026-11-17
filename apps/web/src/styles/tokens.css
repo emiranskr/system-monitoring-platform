@@ -1,0 +1,34 @@
+/*
+ * Semantik tasarim token'lari (proposal §9). Koyu tema varsayilan (:root), acik tema `.light` (yalniz token duzeyinde).
+ * Durum = renk + ikon + metin: renk tek basina gosterge DEGILDIR. Tum metin/durum renkleri her yuzeyde WCAG AA (>= 4.5:1);
+ * bu degerler `src/test/tokens.test.ts` ile otomatik denetlenir (degistirirken testi calistir).
+ */
+:root {
+  --surface-0: #0b0e13;
+  --surface-1: #12161d;
+  --surface-2: #1a2029;
+  --border: #2f3a49;
+  --text-primary: #e6e9ef;
+  --text-secondary: #a3adbb;
+  --accent: #6ba6ff;
+  --status-ok: #3ecf8e;
+  --status-warn: #f5b83d;
+  --status-crit: #ff7b7b;
+  --status-offline: #9aa5b5;
+  --status-unknown: #8fa0ba;
+}
+
+.light {
+  --surface-0: #ffffff;
+  --surface-1: #f4f6f9;
+  --surface-2: #e9edf2;
+  --border: #b7c1ce;
+  --text-primary: #101418;
+  --text-secondary: #46515f;
+  --accent: #1a56c4;
+  --status-ok: #0b6b42;
+  --status-warn: #7a4f00;
+  --status-crit: #a61f1f;
+  --status-offline: #4b5666;
+  --status-unknown: #3f5a85;
+}
