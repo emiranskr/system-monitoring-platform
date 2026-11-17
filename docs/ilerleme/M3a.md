@@ -1,6 +1,6 @@
 # M3a — Kullanıcılar, Oturumlar, Okuma API'si, SSE (durum)
 
-Tarih: 2026-11-15. Dal: `feat/m3a-backend` (taban `feat/m1-agent` @ `caea950`). Tasarım: `docs/superpowers/specs/2026-11-15-m3-auth-panel-design.md`; plan: `docs/superpowers/plans/2026-11-15-m3a-backend.md`. **Birleştirilmedi, push yok.** **Bağımsız inceleme yapıldı: RET (Critical 0, Important 2)** — ayrıntı ve yarınki iş sırası `docs/ilerleme/M3a-bagimsiz-inceleme.md`. I-1 (kodlu yolla oturum kapısı atlatma) ve I-2 (SSE sayaç/abonelik sızıntısı) kapanmadan M3a kabul edilmez. Aşağıdaki §3'teki "ham sıkıştırma" ifadesi YANLIŞTIR (bkz. inceleme M-4a).
+Tarih: 2026-11-15. Dal: `feat/m3a-backend` (taban `feat/m1-agent` @ `caea950`). Tasarım: `docs/superpowers/specs/2026-11-15-m3-auth-panel-design.md`; plan: `docs/superpowers/plans/2026-11-15-m3a-backend.md`. **Birleştirilmedi, push yok.** **Bağımsız inceleme:** ilk tur (2026-11-15) RET (Critical 0, Important 2: I-1 kodlu yolla oturum kapısı atlatma, I-2 SSE sayaç/abonelik sızıntısı); düzeltmeler `12dfb72`, `c121e76`, `c4f28bc`; **dar yeniden inceleme (2026-11-17) KABUL: Critical 0 / Important 0** (210 isteklik yol-atlatma taraması, 600 soketlik SSE sızıntı stresi, 5 mutasyon yakalandı). Ayrıntı: `docs/ilerleme/M3a-bagimsiz-inceleme.md`. Kalan Minor'lar: "genel yol kararı yalnız eşlenen desene göre" için kilit test yok (sonuç daha katı, açık değil), I-2 testi zamanlamaya bağlı (5 ms/1500 ms), `res.on("error")` testsiz. ChatGPT birleştirme onayı bekleniyor.
 
 ## 1. Yapılanlar ve kanıtlar
 | Görev | Çıktı | Kanıt |
