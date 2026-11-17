@@ -55,7 +55,7 @@ describe("rangeToWindow / zoomRange / maxPointsForWidth", () => {
     expect(zoomRange("24h", "in")).toBe("6h"); expect(zoomRange("24h", "out")).toBe("7d");
     expect(zoomRange("1h", "in")).toBe("1h"); expect(zoomRange("30d", "out")).toBe("30d");
   });
-  it.each([[0, 600], [NaN, 600], [5, 10], [300, 300], [800.4, 800], [5000, 1500]])("genislik %s px -> max_points %i (API araligi 10..1500)", (w, want) => {
+  it.each([[0, 600], [NaN, 600], [5, 10], [300, 300], [800.4, 800], [5000, 1500], [510, 500], [549, 500], [1234, 1200]])("genislik %s px -> max_points %i (API araligi 10..1500)", (w, want) => {
     expect(maxPointsForWidth(w)).toBe(want);
   });
 });
@@ -79,5 +79,14 @@ describe("pickMetrics: metrik adlari gercek veriden (metric-names) kesfedilir", 
     expect(labelForAdapter("_AB12-34_", adapters)).toBe("Ethernet"); // { } -> _
     expect(labelForAdapter("bilinmeyen", adapters)).toBe("bilinmeyen");
     expect(labelForAdapter("x", [])).toBe("x");
+  });
+});
+
+import { plotSeries } from "./plotSeries";
+describe("plotSeries: bosluk cizgiyi KESER", () => {
+  it("tum serilerde spanGaps === false (true olursa kesinti cizgiyle kapanir)", () => {
+    const s = plotSeries("CPU", "#6ba6ff");
+    expect(s).toHaveLength(4);
+    for (const x of s.slice(1)) expect(x.spanGaps).toBe(false);
   });
 });

@@ -18,7 +18,7 @@ test.describe("canli guncelleme (SSE) ve kopma yonetimi (gercek tarayici EventSo
   test("yeni ornek sayfa YENILENMEDEN ekranda gorunur", async ({ page }) => {
     await open(page, "/cihazlar");
     await page.evaluate(() => { (window as unknown as { __sentinel: number }).__sentinel = 1; }); // sayfa yenilenirse kaybolur
-    await cpuChanges(page);
+    await cpuChanges(page, 12_000); // < 15 sn yoklama araligi: bu surede yalniz SSE degeri degistirebilir (yoklama kanit sayilmaz)
     expect(await page.evaluate(() => (window as unknown as { __sentinel?: number }).__sentinel)).toBe(1);
     await expect(banner(page)).toHaveCount(0);
   });
@@ -33,7 +33,7 @@ test.describe("canli guncelleme (SSE) ve kopma yonetimi (gercek tarayici EventSo
     // baglanti geri geldi
     await page.unroute("**/api/v1/stream");
     await expect(banner(page)).toHaveCount(0, { timeout: 45_000 }); // geri cekilme <= ~30 sn
-    await cpuChanges(page);
+    await cpuChanges(page, 12_000); // yeniden baglanti sonrasi akis surer
   });
 });
 
@@ -42,6 +42,6 @@ test.describe("canli guncelleme: salt-okunur rol", () => {
 
   test("viewer da canli guncellemeyi gorur (rol baginsiz)", async ({ page }) => {
     await open(page, "/cihazlar");
-    await cpuChanges(page);
+    await cpuChanges(page, 12_000); 
   });
 });

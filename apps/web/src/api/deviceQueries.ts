@@ -25,9 +25,10 @@ export function useMetricNames(id: string) {
   });
 }
 
-export function useMetricSeries(id: string, metric: string, range: RangeId, maxPoints: number) {
+export function useMetricSeries(id: string, metric: string, range: RangeId, maxPoints: number, enabled = true) {
   return useQuery({
     queryKey: deviceKeys.series(id, metric, range, maxPoints),
+    enabled,
     queryFn: ({ signal }) => {
       const w = rangeToWindow(range, new Date());
       const qs = new URLSearchParams({ metric, from: w.from, to: w.to, max_points: String(maxPoints) });

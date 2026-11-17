@@ -1,6 +1,7 @@
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { useEffect, useRef } from "react";
+import { plotSeries } from "./plotSeries";
 import type { UplotData } from "./toUplotData";
 
 export interface UPlotChartProps {
@@ -38,12 +39,7 @@ export function UPlotChart({ data, label, format, height = 220 }: UPlotChartProp
         { stroke: text, grid: { stroke: grid, width: 1 }, ticks: { stroke: grid } },
         { stroke: text, grid: { stroke: grid, width: 1 }, ticks: { stroke: grid }, values: (_u, vals) => vals.map((v) => format(v)), size: 64 },
       ],
-      series: [
-        {},
-        { label, stroke: accent, width: 2, spanGaps: false, points: { show: false } },
-        { label: "min", stroke: "transparent", width: 0, spanGaps: false, points: { show: false } },
-        { label: "maks", stroke: "transparent", width: 0, spanGaps: false, points: { show: false } },
-      ],
+      series: plotSeries(label, accent),
       bands: [{ series: [3, 2], fill: `${accent}33` }],
     };
     plot.current = new uPlot(opts, [data.x, data.avg, data.min, data.max] as uPlot.AlignedData, el);

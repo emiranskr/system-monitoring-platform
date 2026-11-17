@@ -8,18 +8,20 @@ import { toUplotData } from "./toUplotData";
 import { UPlotChart } from "./UPlotChart";
 
 /** Kapsayicinin piksel genisligi (ResizeObserver): API `max_points` icin. jsdom'da 0 -> varsayilan. */
-function useElementWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
+function useElementWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number, boolean] {
   const ref = useRef<T>(null);
   const [w, setW] = useState(0);
+  const [measured, setMeasured] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     setW(el.clientWidth);
+    setMeasured(true);
     const ro = new ResizeObserver(() => setW(el.clientWidth));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  return [ref, w];
+  return [ref, w, measured];
 }
 
 export interface MetricChartProps {
@@ -35,8 +37,8 @@ export interface MetricChartProps {
 
 /** Tek metrik: veri cekme + uPlot grafigi + ozet + erisilebilir veri tablosu. Bos/yukleniyor/hata durumlari acik. */
 export function MetricChart({ deviceId, metric, title, unit, range, hideTitle }: MetricChartProps) {
-  const [wrapRef, width] = useElementWidth<HTMLDivElement>();
-  const q = useMetricSeries(deviceId, metric, range, maxPointsForWidth(width));
+  const [wrapRef, width, measured] = useElementWidth<HTMLDivElement>();
+  const q = useMetricSeries(deviceId, metric, range, maxPointsForWidth(width), measured); // ilk olcumden once istek atilmaz (cift istek olmaz)
   const [showTable, setShowTable] = useState(false);
   const data = useMemo(() => (q.data ? toUplotData(q.data.points, q.data.bucket_seconds) : null), [q.data]);
   const fmt = (v: number) => formatValue(unit, v);

@@ -26,7 +26,7 @@ Tarih: 2026-11-17. Dal: `feat/m3b-web` (taban `feat/m1-agent` @ `dd373d7`, M3a b
 4. Giriş hız sınırı, her E2E testinin UI'dan giriş yapmasıyla tetiklendi (test düzeni): `storageState` ile rol başına tek giriş.
 
 ## 3. Ölçüm (ÖN ÖLÇÜM, tek makine)
-Örnekten ekrana (ingest gönderimi → ekranda CPU değeri, SSE, 30 örnek): **p50 19 ms · p95 25 ms · p99 40 ms · maks 40 ms** (bütçe < 10 sn). **Sınırlar:** API, DB, Vite ve tarayıcı aynı makinede; ajanın örnek toplama/batch yaşı (gerçek ajan örneği batch aralığı kadar bekletir) ve gerçek ağ gecikmesi DAHİL DEĞİL; yoklama değil SSE yolu ölçüldü. Resmi ölçüm değildir. Ham sonuç: `docs/ilerleme/kanit/m3b-latency-30ornek.json`.
+Örnekten ekrana (ingest gönderimi → ekranda CPU değeri, SSE, 30 örnek): **p50 18 ms · p95 19 ms · p99 35 ms · maks 35 ms** (commit'li ham dosyayla ayni; her koşuda spec dosyayı yeniden yazar) (bütçe < 10 sn). **Sınırlar:** API, DB, Vite ve tarayıcı aynı makinede; ajanın örnek toplama/batch yaşı (gerçek ajan örneği batch aralığı kadar bekletir) ve gerçek ağ gecikmesi DAHİL DEĞİL; yoklama değil SSE yolu ölçüldü. Resmi ölçüm değildir. Ham sonuç: `docs/ilerleme/kanit/m3b-latency-30ornek.json`.
 
 ## 4. Benim kararlarım / sapmalar (kontrol edilsin)
 - **shadcn/ui CLI kullanılmadı:** shadcn deseninde sade bileşenler (`Button`/`Input`/`Label`) elle yazıldı; `Dialog` ve `Tabs` Radix tabanlı (`@radix-ui/react-*`). Tasarımın "shadcn/ui" ifadesinden sapma.
@@ -45,3 +45,15 @@ Tarih: 2026-11-17. Dal: `feat/m3b-web` (taban `feat/m1-agent` @ `dd373d7`, M3a b
 - `net.*` metrik adlandırması (bayt/sn), `vite.config.ts` içindeki `__dirname` uyarısı (Vite `configLoader: native`), açık tema axe testi, grafikte canlı nokta ekleme.
 - Üretim dağıtımı: statik sunum, CSP başlıkları, TLS (M6).
 - Sıradaki: bağımsız M3b incelemesi (Critical 0 / Important 0) → bulgu düzeltmeleri → dar yeniden inceleme → ChatGPT özeti → birleştirme kararı.
+
+## 6. Bağımsız inceleme 1 (2026-11-17): Critical 0 / Important 3 (+1 kapsam boşluğu) → düzeltildi
+İnceleyen ayrı ajan; Docker kapalıydı, bu yüzden E2E/DB'li API testleri incelemede KOŞTURULMADI (web birim 182, lint, build, protocol 24 koştu).
+| Bulgu | Düzeltme |
+|---|---|
+| İ-1 form kontrolü sınır kontrastı < 3:1 (WCAG 1.4.11) | yeni `--border-control` token (koyu/açık), Input/select/ghost düğmede; token testi ≥ 3:1 (3 yüzey) |
+| İ-2 `live.spec` "SSE ile güncellenir" yoklamayla da geçiyordu | zaman aşımı 12 sn (< 15 sn yoklama); **E2E koşturulamadı (Docker kapalı) → Docker açılınca koşturulacak** |
+| İ-3 grafik `max_points` genişliğe bağlı: çift istek + yeniden boyutlama fırtınası | genişlik 100 px adımlarına yuvarlanır; ilk ölçümden önce istek yok (`enabled`) |
+| İ-4 `spanGaps:false` hiçbir testte kilitli değildi | `plotSeries` ayrıldı + birim test |
+| M-2 gecikme rakamları ham dosyayla uyuşmuyordu | belge dosyayla eşitlendi (p50 18 / p95 19 / p99 35 / maks 35) |
+
+**Bilinen, kabul edilen (Minor, takip):** M-1 seri uçlarındaki/izole tek örnek kesinti görünürlüğü; M-3 fleet sıralama testi zayıf + sabit beklemeler; M-4 masaüstünde dokunma hedefi iddiası yok; M-5 `strictObject` yanıtlar (panel ve API birlikte dağıtılmalı); M-6 OpenAPI'de eksik hata yanıtları (login 400/403, stream 400); M-7 `closed` sonrası `/me` ağ hatasında akış yeniden açılmaz, logout isteği başarısızsa UI çıkmış görünür; M-8 15 sn yoklama + 5 dk keep-alive boşta süresini fiilen devre dışı bırakır (yalnız mutlak 12 sa geçerli; duvar panosu için kasıtlı); M-9 `Cache-Control: no-store` yok (M6); M-10 her 403 "rol yok" gösterir; M-11 "Ort" ağırlıksız kova ortalaması.

@@ -68,7 +68,7 @@ export function DevicesPage() {
         </div>
         <div>
           <label htmlFor="durum" className="mb-1 block text-sm font-medium">Durum</label>
-          <select id="durum" value={status} onChange={(e) => setStatus(e.target.value as DeviceStatus | "all")} className="min-h-11 rounded-md border border-border bg-surface-0 px-3 text-text-primary">
+          <select id="durum" value={status} onChange={(e) => setStatus(e.target.value as DeviceStatus | "all")} className="min-h-11 rounded-md border border-border-control bg-surface-0 px-3 text-text-primary">
             <option value="all">Tümü</option>
             {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
           </select>

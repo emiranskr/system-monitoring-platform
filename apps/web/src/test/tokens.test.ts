@@ -38,6 +38,13 @@ describe.each([[":root", "koyu (varsayilan)"], [".light", "acik"]])("tokenlar: %
     expect(contrastRatio(t["border"]!, t["surface-1"]!)).toBeGreaterThanOrEqual(1.3);
   });
 
+  it("form kontrol siniri her yuzeyde >= 3:1 (WCAG 1.4.11 bilesen siniri)", () => {
+    const fails: string[] = [];
+    for (const bg of SURFACES) { const r = contrastRatio(t["border-control"] ?? "#000000", t[bg]!); if (r < 3) fails.push(`border-control on ${bg}: ${r.toFixed(2)}`); }
+    expect(t["border-control"]).toBeDefined();
+    expect(fails).toEqual([]);
+  });
+
   it("durum renkleri birbirinden ayirt edilir (ayni renk iki durumda kullanilmaz)", () => {
     const vals = ["status-ok", "status-warn", "status-crit", "status-offline", "status-unknown"].map((k) => t[k]!.toLowerCase());
     expect(new Set(vals).size).toBe(vals.length);

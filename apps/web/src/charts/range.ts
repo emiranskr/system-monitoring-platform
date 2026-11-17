@@ -24,5 +24,5 @@ export function zoomRange(range: RangeId, dir: "in" | "out"): RangeId {
 /** `max_points`: grafik piksel genisligi, API'nin 10..1500 araligina sikistirilir; bilinmiyorsa 600. */
 export function maxPointsForWidth(px: number): number {
   if (!Number.isFinite(px) || px <= 0) return 600;
-  return Math.min(1500, Math.max(10, Math.round(px)));
+  return Math.min(1500, Math.max(10, Math.round(px / 100) * 100)); // 100 px adim: yeniden boyutlamada sorgu firtinasi olmaz
 }
