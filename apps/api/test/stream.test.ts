@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { request, type IncomingMessage } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { SampleEventPayloadSchema } from "@sysmon/protocol";
 import { SampleBus } from "../src/events.js";
 import { hashToken } from "../src/tokens.js";
 import { addUser, iso, loginAs, setupKit, type Kit } from "./kit.js";
@@ -61,7 +62,7 @@ function openStream(cookie: string | null, query = ""): Promise<Sse> {
     req.end();
   });
 }
-const samples = (s: Sse) => s.events.filter((e) => e.event === "sample").map((e) => JSON.parse(e.data));
+const samples = (s: Sse) => s.events.filter((e) => e.event === "sample").map((e) => SampleEventPayloadSchema.parse(JSON.parse(e.data))); // sozlesme: SSE olay govdesi semayla dogrulanir
 
 beforeAll(async () => {
   k = await setupKit({ stream: { heartbeatMs: 100, revalidateMs: 150 } });

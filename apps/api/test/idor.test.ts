@@ -45,6 +45,16 @@ describe("A kullanicisi B kaynaklarina erisemez", () => {
     expect(other.body).not.toContain("4242");
   });
 
+  it("metric-names: B'nin cihazi 404 (olmayanla ayni govde), B'nin metrik adi hicbir yanitta yok", async () => {
+    await k.db.pool.query("INSERT INTO metric_samples (ts, org_id, device_id, metric, value) VALUES ($1,$2,$3,'b.gizli_metrik',1)", [new Date(k.clock.now.getTime() - 5_000), orgB, devB]);
+    const other = await api(k, "GET", `/api/v1/devices/${devB}/metric-names`, { cookie: cookieA });
+    const missing = await api(k, "GET", `/api/v1/devices/${UNKNOWN}/metric-names`, { cookie: cookieA });
+    expect(other.statusCode).toBe(404);
+    expect(other.body).toBe(missing.body);
+    expect(other.body).not.toContain("gizli");
+    expect((await api(k, "GET", `/api/v1/devices/${devA}/metric-names`, { cookie: cookieA })).body).not.toContain("gizli");
+  });
+
   it("filo listesi: B'nin cihazi ve org'u yok", async () => {
     const r = await api(k, "GET", "/api/v1/devices", { cookie: cookieA });
     expect(r.statusCode).toBe(200);
@@ -77,7 +87,7 @@ describe("A kullanicisi B kaynaklarina erisemez", () => {
 
 /** Her /api/v1 rotasi ya org-verisi tasir (IDOR testlerinde kapsanmali) ya da org-notr olarak bilincli siniflandirilmali. */
 const IDOR_COVERED = new Set([
-  "GET /api/v1/devices", "GET /api/v1/devices/:id", "GET /api/v1/devices/:id/metrics", "GET /api/v1/stream", "POST /api/v1/enrollment-tokens",
+  "GET /api/v1/devices", "GET /api/v1/devices/:id", "GET /api/v1/devices/:id/metrics", "GET /api/v1/devices/:id/metric-names", "GET /api/v1/stream", "POST /api/v1/enrollment-tokens",
 ]);
 const ORG_NEUTRAL = new Set(["POST /api/v1/setup", "POST /api/v1/login", "POST /api/v1/logout", "GET /api/v1/me"]);
 

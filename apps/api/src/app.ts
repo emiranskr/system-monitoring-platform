@@ -10,6 +10,7 @@ import { registerSessionGuard } from "./session-guard.js";
 import { registerAuthRoutes } from "./users.js";
 import { registerDevices } from "./devices.js";
 import { registerMetricsQuery } from "./metrics-query.js";
+import { registerMetricNames } from "./metric-names.js";
 import { registerEnrollmentAdmin } from "./enrollment-admin.js";
 import { SampleBus } from "./events.js";
 import { registerStream, type StreamOptions } from "./stream.js";
@@ -81,6 +82,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   registerAuthRoutes(app, opts.pool, now, sessionCfg, limiters);
   registerDevices(app, opts.pool, now, sampleIntervalSeconds);
   registerMetricsQuery(app, opts.pool, now);
+  registerMetricNames(app, opts.pool, now);
   registerEnrollmentAdmin(app, opts.pool, now, limiters);
   const bus = new SampleBus();
   app.decorate("sampleBus", bus);
