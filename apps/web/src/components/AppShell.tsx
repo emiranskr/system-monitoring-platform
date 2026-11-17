@@ -2,6 +2,7 @@ import { SignOut } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../lib/cn";
+import { LiveBanner } from "../live/LiveProvider";
 import { useSession } from "../session/SessionProvider";
 
 const link = ({ isActive }: { isActive: boolean }) =>
@@ -27,6 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
       </header>
+      <LiveBanner />
       <main id="icerik" tabIndex={-1}>{children}</main>
     </div>
   );

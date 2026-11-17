@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 import { Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
+import { LiveProvider } from "./live/LiveProvider";
 import { DevicePage } from "./pages/DevicePage";
 import { DevicesPage } from "./pages/DevicesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { RequireAuth } from "./session/RequireAuth";
 
-const protectedPage = (page: ReactNode) => <RequireAuth><AppShell>{page}</AppShell></RequireAuth>;
+const protectedPage = (page: ReactNode) => <RequireAuth><LiveProvider><AppShell>{page}</AppShell></LiveProvider></RequireAuth>;
 
 /** Yonlendirme tablosu. Saglayicilar (QueryClient, Router, Session) main.tsx'te / testlerde dissaldan verilir. */
 export function App() {
