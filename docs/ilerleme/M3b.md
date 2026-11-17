@@ -11,8 +11,8 @@ Tarih: 2026-11-17 (devam ediyor). Dal: `feat/m3b-web` (taban `feat/m1-agent` @ `
 | G4 API istemcisi + oturum + Giriş | **Tamam** `8eebf1f` | web 48 test; mutasyonlar: sözleşme doğrulaması, keep-alive görünürlük, login-401 ayrımı yakalandı; safeNext `//` kontrolü EŞDEĞER (URL kökeni kontrolü aynı girdiyi reddediyor, bilinçli savunma derinliği) |
 | G5 Genel bakış + Cihaz listesi + kabuk | **Tamam** `e532f66` | web 89 test; Türkçe i/I/ı/İ arama katlaması testle bulundu; NULL-sona mutasyonu yakalandı; **karar:** mobilde kart yerine sütun azaltma (Bellek/Disk gizlenir) |
 | G6 Cihaz detayı + grafikler | **Tamam** `21eb42c` | web 140 test; boşluk=kesinti eşik mutasyonu, özet/yakınlaştırma/“yok” durumu mutasyonları yakalandı. uPlot jsdom’da sahte (gerçek çizim G9 E2E’de doğrulanacak). **Bulgu:** ağ metrikleri `net.*.rx_bps/tx_bps` BAYT/sn (adı yanıltıcı); arayüz B/s-KB/s-MB/s gösterir, adlandırma düzeltmesi ajan/protokol değişikliği → takip |
-| G7 "Cihaz ekle" | Bekliyor | |
-| G8 SSE istemcisi | Bekliyor | |
+| G7 "Cihaz ekle" | **Tamam** `73b2f0f` | web 154 test; 4 mutasyon yakalandı (token silme, rol, TTL, mutasyon 401) |
+| G8 SSE istemcisi | **Tamam** `a5b48c9` | web 178 test; 6 mutasyon yakalandı (geri çekilme sınırı/sıfırlama, closed yeniden bağlanma, revoked canlanma, olay doğrulama, closed+401). **Karar/sapma:** grafik serisine canlı nokta ekleme YOK (SSE liste/özet/detay durumunu günceller; seriler 15 sn yoklama); yoklama SSE varken de açık (cihazın sessizce çevrimdışı olması SSE olayı üretmez) |
 | G9 Playwright E2E (gerçek backend) + axe + responsive + gecikme | Bekliyor | Chrome kurulu (`C:\Program Files\Google\Chrome\Application\chrome.exe`), `channel:"chrome"`; tarayıcı indirme yok |
 | G10 Belgeler + bağımsız inceleme | Bekliyor | |
 
