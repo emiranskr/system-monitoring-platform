@@ -1,4 +1,4 @@
-export type Unit = "pct" | "bytes_per_sec";
+export type Unit = "pct" | "bytes_per_sec" | "bytes" | "celsius" | "watt" | "mhz";
 
 /**
  * Agent `net.<anahtar>.rx_bps|tx_bps` metriklerini BAYT/SN olarak gonderir (Collectors.cs: fark baytlar / saniye) — metrik adindaki
@@ -14,8 +14,25 @@ export function formatBytesPerSec(v: number): string {
   return `${x.toFixed(1)} ${units[i]}`;
 }
 
+/** Bayt miktari (1024 tabanli): B, KB, MB, GB, TB. */
+export function formatBytes(v: number): string {
+  if (Number.isNaN(v)) return "—";
+  if (v < 1024) return `${Math.max(0, Math.round(v))} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let x = v / 1024, i = 0;
+  while (x >= 1024 && i < units.length - 1) { x /= 1024; i++; }
+  return `${x.toFixed(1)} ${units[i]}`;
+}
+
 export function formatValue(unit: Unit, v: number): string {
-  return unit === "pct" ? `%${Math.round(v)}` : formatBytesPerSec(v);
+  switch (unit) {
+    case "pct": return `%${Math.round(v)}`;
+    case "bytes_per_sec": return formatBytesPerSec(v);
+    case "bytes": return formatBytes(v);
+    case "celsius": return `${Math.round(v)} °C`;
+    case "watt": return `${v.toFixed(1)} W`;
+    case "mhz": return `${Math.round(v)} MHz`;
+  }
 }
 
 /** HH:MM:SS (24 sa). timeZone testlerde sabitlenir; uygulamada tarayici dilimi. */

@@ -88,10 +88,10 @@ describe("Cihaz detayi: baslik ve hata durumlari", () => {
 });
 
 describe("sekmeler ve metrik kesfi", () => {
-  it("tablist: Genel, CPU, Bellek, Depolama, Ag, Bilgi; varsayilan Genel secili", async () => {
+  it("tablist: Genel, CPU, Bellek, Depolama, GPU, Ag, Bilgi; varsayilan Genel secili", async () => {
     renderDevice();
     const list = await screen.findByRole("tablist", { name: "Cihaz bölümleri" });
-    expect(within(list).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Genel", "CPU", "Bellek", "Depolama", "Ağ", "Bilgi"]);
+    expect(within(list).getAllByRole("tab").map((t) => t.textContent)).toEqual(["Genel", "CPU", "Bellek", "Depolama", "GPU", "Ağ", "Bilgi"]);
     expect(within(list).getByRole("tab", { name: "Genel" })).toHaveAttribute("aria-selected", "true");
   });
 
@@ -111,8 +111,35 @@ describe("sekmeler ve metrik kesfi", () => {
     expect(screen.queryByRole("img", { name: "Bellek kullanımı" })).toBeNull();
     await user.click(screen.getByRole("tab", { name: "Depolama" }));
     expect(await screen.findByText(/bu donanımda yok/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "GPU" }));
+    expect(await screen.findByText(/bu donanımda yok/i)).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Ağ" }));
     expect(await screen.findByText(/bu donanımda yok/i)).toBeInTheDocument();
+  });
+
+  it("GPU sekmesi: kimlik basina baslik (device_info.gpus ile canonical_id eslesirse ad, yoksa kisa kimlik), yalniz mevcut alanlar icin grafik, dogru birimler", async () => {
+    const A = "gpu-46139694-b075-6c98-9b95-3b6f3a465823";
+    const B = "gpu-aaaaaaaa-b075-6c98-9b95-3b6f3a465823";
+    renderDevice({
+      names: ["cpu.total", `gpu.${A}.util_pct`, `gpu.${A}.vram_used_bytes`, `gpu.${A}.vram_total_bytes`, `gpu.${A}.temp_c`, `gpu.${A}.power_w`, `gpu.${B}.util_pct`],
+      detailBody: detail({ device_info: { ...INFO, gpus: [{ canonical_id: A, name: "RTX 5070" }] } }),
+    });
+    const user = userEvent.setup();
+    await screen.findByRole("tablist");
+    await user.click(screen.getByRole("tab", { name: "GPU" }));
+    expect(await screen.findByRole("heading", { name: "RTX 5070" })).toBeInTheDocument();     // ad eslesti
+    expect(screen.getByRole("heading", { name: "GPU aaaaaaaa" })).toBeInTheDocument();         // eslesme yok: kisa kimlik (ad UYDURULMAZ)
+    expect(await screen.findByRole("img", { name: "RTX 5070: kullanım" })).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: "RTX 5070: VRAM kullanımı" })).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: "RTX 5070: sıcaklık" })).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: "RTX 5070: güç" })).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: "GPU aaaaaaaa: kullanım" })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "RTX 5070: fan hızı" })).toBeNull();              // olmayan alan: grafik YOK
+    expect(screen.queryByRole("img", { name: "GPU aaaaaaaa: sıcaklık" })).toBeNull();
+    // birimler (varsayilan seri son degeri 30): sicaklik C, guc W, VRAM bayt
+    expect(await screen.findByText(/Son 30 °C/)).toBeInTheDocument();
+    expect(await screen.findByText(/Son 30\.0 W/)).toBeInTheDocument();
+    expect(await screen.findByText(/Son 30 B ·/)).toBeInTheDocument();
   });
 
   it("Depolama: her disk icin grafik; Ag: adaptor adi device_info'dan (Wi-Fi), rx/tx ayri", async () => {

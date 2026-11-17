@@ -9,12 +9,19 @@ import { MetricChart } from "../charts/MetricChart";
 import { RangePicker } from "../charts/RangePicker";
 import type { RangeId } from "../charts/range";
 import { ErrorState } from "../components/ErrorState";
+import type { Unit } from "../lib/format";
 import { StatusBadge } from "../components/StatusBadge";
 import { formatRelative } from "../lib/fleet";
 
 const TABS = [
-  ["genel", "Genel"], ["cpu", "CPU"], ["bellek", "Bellek"], ["depolama", "Depolama"], ["ag", "Ağ"], ["bilgi", "Bilgi"],
+  ["genel", "Genel"], ["cpu", "CPU"], ["bellek", "Bellek"], ["depolama", "Depolama"], ["gpu", "GPU"], ["ag", "Ağ"], ["bilgi", "Bilgi"],
 ] as const;
+
+/** GPU gorunen adi: device_info.gpus ile canonical_id eslesirse ad; yoksa kisa kimlik (ad UYDURULMAZ). */
+function gpuLabel(id: string, gpus: { canonical_id: string; name: string }[]): string {
+  const hit = gpus.find((g) => g.canonical_id === id);
+  return hit ? hit.name : `GPU ${id.replace(/^gpu-/, "").slice(0, 8)}`;
+}
 
 const Missing = () => <p className="rounded-lg border border-border bg-surface-1 p-6 text-text-secondary">Bu donanımda yok.</p>;
 
@@ -50,7 +57,9 @@ export function DevicePage() {
   const m = pickMetrics(names.data?.metrics.map((x) => x.name) ?? []);
   const adapters = d.device_info?.adapters ?? [];
 
-  const chart = (metric: string, title: string, unit: "pct" | "bytes_per_sec", hideTitle?: boolean) =>
+  const gpuInfo = d.device_info?.gpus ?? [];
+
+  const chart = (metric: string, title: string, unit: Unit, hideTitle?: boolean) =>
     <MetricChart key={metric} deviceId={id} metric={metric} title={title} unit={unit} range={range} hideTitle={hideTitle} />;
   const waiting = names.isPending ? <p role="status" className="text-text-secondary">Metrikler yükleniyor…</p> : null;
 
@@ -87,6 +96,27 @@ export function DevicePage() {
           {waiting}
           {m.disks.map((dk) => chart(dk.metric, `Disk ${dk.letter.toUpperCase()}: doluluk`, "pct"))}
           {!names.isPending && m.disks.length === 0 ? <Missing /> : null}
+        </Tabs.Content>
+        <Tabs.Content value="gpu" className="mt-4 space-y-4">
+          {waiting}
+          {m.gpus.map((g) => {
+            const label = gpuLabel(g.id, gpuInfo);
+            return (
+              <div key={g.id} className="space-y-2">
+                <h2 className="text-lg font-semibold">{label}</h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {g.util ? chart(g.util, `${label}: kullanım`, "pct", true) : null}
+                  {g.vramUsed ? chart(g.vramUsed, `${label}: VRAM kullanımı`, "bytes", true) : null}
+                  {g.temp ? chart(g.temp, `${label}: sıcaklık`, "celsius", true) : null}
+                  {g.power ? chart(g.power, `${label}: güç`, "watt", true) : null}
+                  {g.fan ? chart(g.fan, `${label}: fan hızı`, "pct", true) : null}
+                  {g.core ? chart(g.core, `${label}: çekirdek saati`, "mhz", true) : null}
+                  {g.mem ? chart(g.mem, `${label}: bellek saati`, "mhz", true) : null}
+                </div>
+              </div>
+            );
+          })}
+          {!names.isPending && m.gpus.length === 0 ? <Missing /> : null}
         </Tabs.Content>
         <Tabs.Content value="ag" className="mt-4 space-y-4">
           {waiting}

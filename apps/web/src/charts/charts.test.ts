@@ -70,8 +70,8 @@ describe("pickMetrics: metrik adlari gercek veriden (metric-names) kesfedilir", 
     expect(m.nets).toEqual([{ key: "eth0", rx: "net.eth0.rx_bps", tx: "net.eth0.tx_bps" }, { key: "wifi", rx: "net.wifi.rx_bps", tx: null }]);
   });
   it("hicbiri yoksa null/bos (GPU gibi bilinmeyenler yok sayilir; sifir cizilmez)", () => {
-    expect(pickMetrics([])).toEqual({ cpu: null, mem: null, disks: [], nets: [] });
-    expect(pickMetrics(["gpu.temp"])).toEqual({ cpu: null, mem: null, disks: [], nets: [] });
+    expect(pickMetrics([])).toEqual({ cpu: null, mem: null, disks: [], nets: [], gpus: [] });
+    expect(pickMetrics(["gpu.temp"])).toEqual({ cpu: null, mem: null, disks: [], nets: [], gpus: [] });
   });
   it("labelForAdapter: device_info.adapters ile en iyi cabayla eslesir (buyuk/kucuk harf, ozel karakterler _ olur); yoksa anahtar", () => {
     const adapters = [{ id: "{AB12-34}", name: "Ethernet" }, { id: "wifi0", name: "Wi-Fi" }];
@@ -88,5 +88,23 @@ describe("plotSeries: bosluk cizgiyi KESER", () => {
     const s = plotSeries("CPU", "#6ba6ff");
     expect(s).toHaveLength(4);
     for (const x of s.slice(1)) expect(x.spanGaps).toBe(false);
+  });
+});
+
+describe("pickMetrics: GPU gruplari (gpu.<CanonicalId>.<alan>)", () => {
+  it("kimlige gore gruplanir ve siralanir; olmayan alan null", () => {
+    const m = pickMetrics([
+      "gpu.gpu-bbb.util_pct", "gpu.gpu-aaa.util_pct", "gpu.gpu-aaa.vram_used_bytes", "gpu.gpu-aaa.vram_total_bytes", "gpu.gpu-aaa.temp_c",
+      "gpu.gpu-aaa.power_w", "gpu.gpu-aaa.fan_pct", "gpu.gpu-aaa.core_clock_mhz", "gpu.gpu-aaa.mem_clock_mhz", "gpu.gpu-aaa.bilinmeyen_alan",
+    ]);
+    expect(m.gpus.map((g) => g.id)).toEqual(["gpu-aaa", "gpu-bbb"]);
+    expect(m.gpus[0]).toEqual({
+      id: "gpu-aaa", util: "gpu.gpu-aaa.util_pct", vramUsed: "gpu.gpu-aaa.vram_used_bytes", vramTotal: "gpu.gpu-aaa.vram_total_bytes", temp: "gpu.gpu-aaa.temp_c",
+      power: "gpu.gpu-aaa.power_w", fan: "gpu.gpu-aaa.fan_pct", core: "gpu.gpu-aaa.core_clock_mhz", mem: "gpu.gpu-aaa.mem_clock_mhz",
+    });
+    expect(m.gpus[1]).toEqual({ id: "gpu-bbb", util: "gpu.gpu-bbb.util_pct", vramUsed: null, vramTotal: null, temp: null, power: null, fan: null, core: null, mem: null });
+  });
+  it("sensor.* ve bilinmeyen alanlar GPU grubu olusturmaz", () => {
+    expect(pickMetrics(["sensor.cpu_package_temp_c", "gpu.gpu-aaa.bilinmeyen_alan"]).gpus).toEqual([]);
   });
 });

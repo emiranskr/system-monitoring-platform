@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { IngestRequestSchema, METRIC_NAME_RE } from "../src/index.js";
+import { IngestRequestSchema, METRIC_NAME_RE, MetricNameSchema } from "../src/index.js";
 
 const golden = () =>
   JSON.parse(readFileSync(new URL("./golden/ingest-valid.json", import.meta.url), "utf8"));
@@ -45,5 +45,29 @@ describe("IngestRequestSchema", () => {
   });
   it("METRIC_NAME_RE cpu.total kabul eder", () => {
     expect(METRIC_NAME_RE.test("cpu.total")).toBe(true);
+  });
+});
+
+describe("M4 GPU/sensor metrik adlari (ajan GpuCollector/SensorCollector ile ayni kurallar)", () => {
+  const id = "gpu-46139694-b075-6c98-9b95-3b6f3a465823"; // NVML UUID tabanli CanonicalId (40 karakter)
+  const fields = ["util_pct", "vram_used_bytes", "vram_total_bytes", "temp_c", "power_w", "fan_pct", "core_clock_mhz", "mem_clock_mhz"];
+
+  it("tum GPU alan adlari gecerli ve 64 karakteri asmaz", () => {
+    for (const f of fields) {
+      const name = `gpu.${id}.${f}`;
+      expect(name.length).toBeLessThanOrEqual(64);
+      expect(MetricNameSchema.safeParse(name).success, name).toBe(true);
+    }
+  });
+  it("PCI tabanli kimlik ve sensor adlari gecerli", () => {
+    expect(MetricNameSchema.safeParse("gpu.pci-0000-01-00-0.util_pct").success).toBe(true);
+    for (const n of ["sensor.cpu_package_temp_c", "sensor.cpu_core_max_temp_c", "sensor.motherboard_temp_c", "sensor.cpu_fan_rpm"])
+      expect(MetricNameSchema.safeParse(n).success, n).toBe(true);
+  });
+  it("kimlikte nokta/bosluk ve 64 karakter ustu reddedilir (kimlik 44 karakteri asamaz)", () => {
+    expect(MetricNameSchema.safeParse("gpu.a.b.util_pct.x").success).toBe(false);
+    expect(MetricNameSchema.safeParse("gpu.luid 0x1.util_pct").success).toBe(false);
+    expect(MetricNameSchema.safeParse(`gpu.${"a".repeat(45)}.vram_used_bytes`).success).toBe(false); // 65 karakter
+    expect(MetricNameSchema.safeParse(`gpu.${"a".repeat(44)}.vram_used_bytes`).success).toBe(true); // tam 64
   });
 });
