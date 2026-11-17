@@ -2,6 +2,8 @@
 
 Tarih: 2026-11-17. Dal: `feat/m3b-web` (taban `feat/m1-agent` @ `dd373d7`, M3a birleştirilmiş). Tasarım: `docs/superpowers/specs/2026-11-17-m3b-web-design.md` (ChatGPT onaylı); plan: `docs/superpowers/plans/2026-11-17-m3b-web.md`; kurulum: `docs/web-kurulum.md`. **Birleştirilmedi, push yok. Bağımsız inceleme henüz yapılmadı** (kapanış ölçütü: Critical 0 / Important 0).
 
+> **DEVİR (2026-11-17 sonu):** Tüm görevler commit'li. Bağımsız inceleme (ayrı ajan) başlatıldı ama sonucu bu oturumda ALINMADI; yarın ilk iş: sonuç yoksa incelemeyi yeniden başlat (`git diff dd373d7..HEAD`, kapsam: güvenlik, doğruluk, sözleşme, E2E geçerliliği/mutasyon, a11y, belge-kod). Sonra bulguları TDD ile düzelt → dar yeniden inceleme → ChatGPT özeti (sapmalar: shadcn CLI yok, mobil sütun azaltma, canlı nokta ekleme yok, net bayt/sn) → fast-forward birleştirme (push yok).
+
 ## 1. Yapılanlar ve kanıtlar
 | Görev | Çıktı | Kanıt |
 |---|---|---|
