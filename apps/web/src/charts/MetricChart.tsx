@@ -81,7 +81,7 @@ export function MetricChart({ deviceId, metric, title, unit, range, hideTitle }:
 /** Grafikle AYNI veri, erisilebilir tablo olarak (ekran okuyucu/klavye icin birincil alternatif). */
 function ChartDataTable({ title, points, fmt }: { title: string; points: { t: string; avg: number; min: number; max: number }[]; fmt: (v: number) => string }) {
   return (
-    <div className="mt-3 max-h-72 overflow-auto rounded-md border border-border">
+    <div role="region" aria-label={`${title} veri tablosu (kaydırılabilir)`} tabIndex={0} className="mt-3 max-h-72 overflow-auto rounded-md border border-border">
       <table className="w-full text-left text-sm tabular-nums">
         <caption className="sr-only">{title} veri tablosu</caption>
         <thead className="sticky top-0 bg-surface-2">

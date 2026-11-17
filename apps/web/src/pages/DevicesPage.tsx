@@ -78,7 +78,7 @@ export function DevicesPage() {
       {rows.length === 0 ? (
         <p className="rounded-lg border border-border bg-surface-1 p-6 text-text-secondary">{q.data.devices.length === 0 ? "Henüz cihaz yok." : "Eşleşen cihaz yok."}</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div role="region" aria-label="Cihaz listesi (kaydırılabilir)" tabIndex={0} className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full border-collapse text-left">
             <caption className="sr-only">Cihaz listesi</caption>
             <thead className="bg-surface-1 text-sm text-text-secondary">
@@ -87,7 +87,7 @@ export function DevicesPage() {
                   const active = sort?.key === c.key ? sort.dir : undefined;
                   return (
                     <th key={c.key} scope="col" aria-sort={active ?? "none"} className={`px-3 py-2 font-medium ${c.cls ?? ""}`}>
-                      <button type="button" onClick={() => toggle(c.key)} className="inline-flex min-h-11 items-center gap-1 hover:text-text-primary">
+                      <button type="button" onClick={() => toggle(c.key)} className="inline-flex min-h-11 min-w-11 items-center gap-1 hover:text-text-primary">
                         {c.label}
                         {active === "ascending" ? <CaretUp size={14} aria-hidden="true" /> : active === "descending" ? <CaretDown size={14} aria-hidden="true" /> : null}
                       </button>

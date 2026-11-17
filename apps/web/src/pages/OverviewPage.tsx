@@ -39,13 +39,15 @@ export function OverviewPage() {
         <p className="rounded-lg border border-border bg-surface-1 p-6 text-text-secondary">Henüz cihaz yok. Cihaz eklemek için Cihazlar sayfasını kullanın.</p>
       ) : (
         <>
-          <section aria-label="Durum özeti" className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          <section aria-label="Durum özeti">
+            <dl className="grid grid-cols-2 gap-3 md:grid-cols-5">
             {STATUS_ORDER.map((st) => (
               <div key={st} className="rounded-lg border border-border bg-surface-1 p-4">
                 <dt className="mb-2"><StatusBadge status={st} /></dt>
                 <dd className="text-3xl font-semibold tabular-nums">{s.counts[st]}</dd>
               </div>
             ))}
+            </dl>
           </section>
           <div className="grid gap-4 md:grid-cols-3">
             <TopList title="En yüksek CPU" devices={s.topCpu} pick={(d) => d.cpu_pct} />
