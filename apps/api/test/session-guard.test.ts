@@ -61,6 +61,41 @@ describe("oturum kapisi", () => {
     }
   });
 
+  // I-1 (bagimsiz inceleme): kapi ham URL'ye bakiyor, yonlendirici ise yolu cozup rotayi eslestiriyor -> yuzde-kodlu yol kapiyi atlatiyordu.
+  it("yuzde-kodlu yol oturum kapisini ATLATAMAZ (yonlendiricinin esledigi rota korunur)", async () => {
+    for (const u of ["/api/v%31/_probe", "/%61pi/v1/_probe", "/api/%76%31/_probe", "/api/v1%2f_probe".replace("%2f", "/")]) {
+      const r = await app.inject({ method: "GET", url: u });
+      expect(r.statusCode, u).toBe(401);
+    }
+  });
+
+  it("yuzde-kodlu yolla CSRF Origin denetimi atlatilamaz: Origin'siz POST 403", async () => {
+    for (const u of ["/api/v%31/_probe", "/%61pi/v1/_probe"]) {
+      const r = await app.inject({ method: "POST", url: u, headers: { ...cookie(adminSid), "content-type": "application/json" }, payload: "{}" });
+      expect(r.statusCode, u).toBe(403);
+    }
+  });
+
+  it("yuzde-kodlu yolla gecerli oturum yine calisir (ayni rota)", async () => {
+    const r = await app.inject({ method: "GET", url: "/api/v%31/_probe", headers: cookie(adminSid) });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ email: "a@x.y" });
+  });
+
+  it("mutlak biçimli istek hedefi (GET http://host/api/v1/...) kapiyi atlatamaz (gercek soket)", async () => {
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const port = (app.server.address() as { port: number }).port;
+    const { connect } = await import("node:net");
+    const status = await new Promise<number>((resolve, reject) => {
+      const s = connect(port, "127.0.0.1", () => s.write("GET http://example.test/api/v1/_probe HTTP/1.1\r\nHost: example.test\r\nConnection: close\r\n\r\n"));
+      let buf = "";
+      s.on("data", (c) => { buf += c.toString("utf8"); });
+      s.on("close", () => resolve(Number(/^HTTP\/1\.1 (\d+)/.exec(buf)?.[1] ?? 0)));
+      s.on("error", reject);
+    });
+    expect(status).toBe(401);
+  });
+
   it("agent yollari (/agent/v1/*) bu kapidan etkilenmez: Origin istenmez, oturum istenmez", async () => {
     const r = await app.inject({ method: "POST", url: "/agent/v1/ingest", headers: { "content-type": "application/json" }, payload: "{}" });
     expect(r.statusCode).toBe(401); // agent kimlik dogrulamasi (bearer), 403 origin DEGIL

@@ -107,6 +107,18 @@ describe("rota kapsam denetimi (yeni rota unutulamaz)", () => {
     }
   });
 
+  it("kodlu yol varyantlariyla da (/api/v%31/...) hicbir korumali rota oturumsuz 401'den baska yanit vermez, 500 yok (I-1)", async () => {
+    for (const route of apiRoutes()) {
+      const [method, path] = route.split(" ") as ["GET" | "POST", string];
+      if (PUBLIC_API_PATHS.has(path)) continue;
+      const encoded = path.replace("/api/v1/", "/api/v%31/").replace(":id", UNKNOWN);
+      const r = await api(k, method, encoded, { body: method === "POST" ? {} : undefined });
+      expect(r.statusCode, `${route} -> ${encoded}`).toBe(401);
+      const cased = await k.app.inject({ method, url: path.replace("/api/v1/", "/%61pi/v1/").replace(":id", UNKNOWN), headers: method === "POST" ? { origin: "https://panel.example.test", "content-type": "application/json" } : {}, ...(method === "POST" ? { payload: "{}" } : {}) });
+      expect(cased.statusCode, `${route} (%61pi)`).toBe(401);
+    }
+  });
+
   it("SURESI DOLMUS/IPTAL oturumla da hicbir korumali rota calismaz", async () => {
     const c = await loginAs(k, "a@example.com", PW);
     await k.db.pool.query("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email='a@example.com')");

@@ -45,10 +45,14 @@ export function setSessionCookie(reply: FastifyReply, raw: string, maxAgeSec: nu
 export function registerSessionGuard(app: FastifyInstance, pool: pg.Pool, now: () => Date, cfg: SessionConfig, allowedOrigins: readonly string[]): void {
   const origins = new Set(allowedOrigins);
   app.addHook("onRequest", async (req: FastifyRequest) => {
-    const path = req.url.split("?")[0]!;
-    if (!path.startsWith("/api/v1/")) return;
+    // Karar YONLENDIRICININ ESLEDIGI rota desenine gore verilir (I-1): ham URL yuzde-kodlu (/api/v%31/..), mutlak biçimli
+    // (GET http://host/api/v1/..) veya baska biçimde olabilir; yonlendirici bunlari cozup rotayi eslestirir, kapi ayni seyi gormelidir.
+    // Ham yol da ek savunma olarak korunur (eslesmeyen /api/v1/ yollari 404'ten once de kapidan gecer).
+    const matched = req.routeOptions?.url ?? "";
+    const rawPath = req.url.split("?")[0]!;
+    if (!matched.startsWith("/api/v1/") && !rawPath.startsWith("/api/v1/")) return;
     if (!SAFE_METHODS.has(req.method) && !origins.has(req.headers.origin ?? "")) throw new HttpError(403, "forbidden_origin");
-    if (PUBLIC_API_PATHS.has(path)) return;
+    if (PUBLIC_API_PATHS.has(matched)) return; // genel mi: yalniz eslenen rota desenine gore
     const sid = parseCookies(req.headers.cookie)[COOKIE_NAME];
     const s = sid ? await resolveSession(pool, sid, now(), cfg) : null;
     if (!s) throw unauthorized();
