@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { SessionExpiredError } from "../api/client";
 import { useDevices } from "../api/queries";
+import { AddDeviceDialog } from "../components/AddDeviceDialog";
 import { ErrorState } from "../components/ErrorState";
 import { StatusBadge } from "../components/StatusBadge";
 import { Input } from "../components/ui/form";
@@ -56,7 +57,10 @@ export function DevicesPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-4 md:p-6">
-      <h1 className="text-2xl font-semibold">Cihazlar</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Cihazlar</h1>
+        <AddDeviceDialog />
+      </div>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-48 flex-1">
           <label htmlFor="ara" className="mb-1 block text-sm font-medium">Cihaz ara</label>

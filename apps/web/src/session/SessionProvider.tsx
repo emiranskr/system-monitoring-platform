@@ -60,6 +60,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (ev.type === "updated" && ev.action.type === "error" && ev.action.error instanceof SessionExpiredError) expire();
   }), [qc, expire]);
 
+  // Mutasyonlarda da 401 oturumu dusurur (ornegin token uretirken oturum bitti).
+  useEffect(() => qc.getMutationCache().subscribe((ev) => {
+    if (ev.type === "updated" && ev.action.type === "error" && ev.action.error instanceof SessionExpiredError) expire();
+  }), [qc, expire]);
+
   useKeepAlive(expire, status === "authed");
 
   const value = useMemo<SessionValue>(() => ({ user, status, error, login, logout, expire }), [user, status, error, login, logout, expire]);
