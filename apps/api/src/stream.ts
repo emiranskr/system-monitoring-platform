@@ -33,7 +33,11 @@ export function registerStream(
       if (!UUID_RE.test(id) || !(await resolveDevice(pool, s.orgId, id))) throw notFound(); // org disi/yok: ayni 404
       wanted.add(id.toLowerCase());
     }
+    // I-2: yukaridaki await'ler (50 cihaza kadar DB sorgusu) sirasinda istemci kopmus olabilir; 'close' olayi o zaman
+    // CAGRILMIS olur ve sonradan baglanan dinleyici hic tetiklenmez. Kopmussa HICBIR yan etki (sayac, abonelik, zamanlayici) olusturma.
+    if (req.raw.destroyed || req.raw.socket?.destroyed) { reply.hijack(); return; }
     if ((open.get(s.userId) ?? 0) >= MAX_STREAMS_PER_USER) throw new HttpError(429, "too_many_streams", {}, { "retry-after": "5" });
+    // Bu noktadan itibaren kapanisa kadar HICBIR await YOK: sayac + abonelik + zamanlayicilar + kapanis dinleyicileri tek senkron blokta kurulur.
     open.set(s.userId, (open.get(s.userId) ?? 0) + 1);
 
     const sid = parseCookies(req.headers.cookie)[COOKIE_NAME] ?? "";
@@ -66,5 +70,6 @@ export function registerStream(
     }, revalidateMs));
     req.raw.on("close", () => finish());
     res.on("close", () => finish());
+    res.on("error", () => finish());
   });
 }

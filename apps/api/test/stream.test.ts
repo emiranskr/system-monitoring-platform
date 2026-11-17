@@ -186,6 +186,28 @@ describe("GET /api/v1/stream", () => {
     } finally { open.forEach((s) => s.close()); }
   });
 
+  // I-2 (bagimsiz inceleme): cihaz suzgeci cozulurken (DB await'leri) kopan istek, sayac/abonelik/zamanlayici sizdiriyordu;
+  // kullanici (surec yeniden baslayana kadar) 429 ile kilitleniyordu.
+  it("suzgec cozulurken KOPAN istekler sayac/abonelik SIZDIRMAZ: sonra yeni akis acilir (429 degil)", async () => {
+    const leaker = await addUser(k, "leak@example.com", PW, "viewer");
+    void leaker;
+    const c = await loginAs(k, "leak@example.com", PW);
+    const ids: string[] = [];
+    for (let i = 0; i < 50; i++) ids.push((await k.db.pool.query("INSERT INTO devices (org_id, name) VALUES ($1,$2) RETURNING id", [k.org, `leak-${i}`])).rows[0].id);
+    const before = k.app.sampleBus.size;
+    await Promise.all(Array.from({ length: 6 }, () => new Promise<void>((resolve) => {
+      const req = request({ host: "127.0.0.1", port, path: `/api/v1/stream?devices=${ids.join(",")}`, headers: { cookie: c } });
+      req.on("error", () => resolve());
+      req.on("close", () => resolve());
+      req.end();
+      setTimeout(() => req.destroy(), 5); // 50 cihazin DB cozumu sirasinda kopar
+    })));
+    await sleep(1500); // sunucu tarafi cozumlerin bitmesi icin
+    expect(k.app.sampleBus.size).toBe(before);
+    const fresh = await openStream(c);
+    try { expect(fresh.status).toBe(200); } finally { fresh.close(); }
+  });
+
   it("istemci kopunca abonelik temizlenir (bus.size geri duser)", async () => {
     await sleep(100);
     const before = k.app.sampleBus.size;
