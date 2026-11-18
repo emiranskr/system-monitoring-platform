@@ -81,6 +81,8 @@ export interface Limits {
   setupPerIp?: number;
   /** Kullanici basina enrollment token uretimi / pencere. */
   enrollTokenPerUser?: number;
+  /** Kullanici basina kanal test bildirimi / pencere (disariya e-posta/webhook tetikleme kotuye kullanimi). */
+  channelTestPerUser?: number;
   windowMs?: number;
 }
 
@@ -93,6 +95,7 @@ export interface Limiters {
   loginPerIp: RateLimiter;
   setupPerIp: RateLimiter;
   enrollTokenPerUser: RateLimiter;
+  channelTestPerUser: RateLimiter;
 }
 
 export function createLimiters(l: Limits | undefined, now: () => Date): Limiters {
@@ -108,6 +111,7 @@ export function createLimiters(l: Limits | undefined, now: () => Date): Limiters
     loginPerIp: new RateLimiter(l?.loginPerIp ?? 60, w, now),
     setupPerIp: new RateLimiter(l?.setupPerIp ?? 10, w, now),
     enrollTokenPerUser: new RateLimiter(l?.enrollTokenPerUser ?? 10, w, now),
+    channelTestPerUser: new RateLimiter(l?.channelTestPerUser ?? 5, w, now),
   };
 }
 

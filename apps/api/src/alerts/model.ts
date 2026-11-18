@@ -1,29 +1,15 @@
+import { ALERT_AGGS, ALERT_BUILTINS, ALERT_OPERATORS, ALERT_SEVERITIES, OFFLINE_METRIC, isAllowedAlertMetric } from "@sysmon/protocol";
+
 /**
- * Uyari kuralinin izinli degerleri: SABIT izin listesi. Kullanicidan gelen metrik adi/operator/agg HICBIR zaman SQL metnine eklenmez
- * (sorgularda yalniz parametre); bu liste ayrica kural olusturma ve degerlendirme sirasinda ikinci kez uygulanir.
+ * Uyari kuralinin izinli degerleri: SABIT izin listesi, TEK kaynak packages/protocol/src/alerts.ts. Kullanicidan gelen metrik
+ * adi/operator/agg HICBIR zaman SQL metnine eklenmez (sorgularda yalniz parametre); liste kural olusturmada ve degerlendirmede uygulanir.
  */
-export const OPERATORS = [">", ">=", "<", "<="] as const;
-export const AGGS = ["avg", "max"] as const;
-export const SEVERITIES = ["info", "warning", "critical"] as const;
-export const BUILTINS = ["offline", "disk_full", "cpu_high", "mem_high"] as const;
-
-/** Ozel metrik: cihazin sunucuya son ulasma zamanindan beri gecen saniye (ornek `ts` DEGIL, sunucu alim zamani). */
-export const OFFLINE_METRIC = "device.offline";
-
-const SEG = "[A-Za-z0-9_\\-:]";
-const METRIC_PATTERNS: RegExp[] = [
-  /^cpu\.total$/,
-  /^mem\.used_pct$/,
-  new RegExp(`^disk\\.(\\*|${SEG}{1,30})\\.used_pct$`),
-  new RegExp(`^net\\.(\\*|${SEG}{1,40})\\.(rx_bps|tx_bps)$`),
-  new RegExp(`^gpu\\.(\\*|[A-Za-z0-9\\-:]{1,44})\\.(util_pct|temp_c|vram_used_bytes|power_w|fan_pct|core_clock_mhz|mem_clock_mhz)$`),
-  /^sensor\.(cpu_package_temp_c|cpu_core_max_temp_c|motherboard_temp_c|cpu_fan_rpm)$/,
-  /^device\.offline$/,
-];
-
-export function isAllowedMetric(m: unknown): m is string {
-  return typeof m === "string" && m.length <= 64 && METRIC_PATTERNS.some((re) => re.test(m));
-}
+export const OPERATORS = ALERT_OPERATORS;
+export const AGGS = ALERT_AGGS;
+export const SEVERITIES = ALERT_SEVERITIES;
+export const BUILTINS = ALERT_BUILTINS;
+export { OFFLINE_METRIC };
+export const isAllowedMetric = isAllowedAlertMetric;
 
 /** `*` iceren metrik (orn. disk.*.used_pct) icin LIKE kalibi; `%`, `_`, `\` kacirilir. Joker yoksa null. */
 export function metricLikePattern(m: string): string | null {

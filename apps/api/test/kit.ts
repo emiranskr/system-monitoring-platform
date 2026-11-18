@@ -14,15 +14,17 @@ export interface Kit {
 }
 
 export const KEY = Buffer.alloc(32, 7); // test AES-256 anahtari
+export const CHANNEL_KEY = Buffer.alloc(32, 3); // kanal sirlari icin test anahtari (M5)
 
 /** Panel testlerinde izinli Origin (CSRF denetimi). */
 export const ORIGIN = "https://panel.example.test";
 
-export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number; trustProxy?: boolean | string[]; limits?: AppOptions["limits"]; auth?: AppOptions["auth"]; stream?: AppOptions["stream"] } = {}): Promise<Kit> {
+export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number; trustProxy?: boolean | string[]; limits?: AppOptions["limits"]; auth?: AppOptions["auth"]; stream?: AppOptions["stream"]; channelKey?: Buffer | null; alerts?: AppOptions["alerts"] } = {}): Promise<Kit> {
   const db = await createTestDb();
   const clock = { now: new Date("2026-11-12T12:00:00Z") };
   const app = buildApp({ pool: db.pool, now: () => clock.now, credentialKey: KEY, spkiPins: opts.spkiPins, sampleIntervalSeconds: opts.sampleIntervalSeconds, trustProxy: opts.trustProxy,
     auth: opts.auth ?? { allowedOrigins: [ORIGIN] }, stream: opts.stream,
+    channelKey: opts.channelKey === null ? undefined : (opts.channelKey ?? CHANNEL_KEY), alerts: opts.alerts,
     // Sinir testleri disindaki testler cok sayida istegi ayni IP'den ve sabit saatle yapar: sinirlar yuksek tutulur.
     limits: opts.limits ?? { enrollPerIp: 100_000, ingestPerDevice: 100_000, failedAuthPerIp: 100_000, rotatePerDevice: 100_000, loginPerKey: 100_000, loginPerIp: 100_000, setupPerIp: 100_000, enrollTokenPerUser: 100_000 } });
   await app.ready();
@@ -55,7 +57,7 @@ export function ping(k: Kit, token: string, seq = 0, epoch = "11111111-1111-4111
 }
 
 /** Panel (/api/v1) istegi: izinli Origin ile; cookie verilirse oturumlu. */
-export const api = (k: Kit, method: "GET" | "POST", url: string, opts: { body?: unknown; cookie?: string; origin?: string | null } = {}) =>
+export const api = (k: Kit, method: "GET" | "POST" | "PATCH" | "DELETE", url: string, opts: { body?: unknown; cookie?: string; origin?: string | null } = {}) =>
   k.app.inject({
     method, url,
     headers: {

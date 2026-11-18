@@ -14,6 +14,11 @@ import { registerMetricNames } from "./metric-names.js";
 import { registerEnrollmentAdmin } from "./enrollment-admin.js";
 import { SampleBus } from "./events.js";
 import { registerStream, type StreamOptions } from "./stream.js";
+import { IngestHealth } from "./alerts/ingest-health.js";
+import { startAlertJobs } from "./alerts/jobs.js";
+import { OFFLINE_GRACE_MS } from "./alerts/model.js";
+import type { LookupAll } from "./alerts/net-guard.js";
+import { registerAlertRoutes } from "./alerts/routes.js";
 
 export interface AppOptions {
   pool: pg.Pool;
@@ -36,6 +41,23 @@ export interface AppOptions {
   auth?: { allowedOrigins: string[]; idleMinutes?: number; absoluteHours?: number };
   /** SSE zamanlayicilari (varsayilan: kalp atisi 25 sn, oturum yeniden dogrulama 60 sn); testler kisaltir. */
   stream?: StreamOptions;
+  /**
+   * Kanal sirlari (webhook URL'si, SMTP parolasi) icin AES-256-GCM anahtari (32 bayt; ortam: CHANNEL_KEY base64). Yoksa kanal olusturma
+   * 503 doner ve bildirim gonderilmez (sirlar duz metin saklanmaz).
+   */
+  channelKey?: Buffer;
+  /** Uyari sistemi (M5). `jobs: true` zamanlanmis degerlendirici + bildirim kuyrugunu baslatir (sunucu); testler elle cagirir. */
+  alerts?: {
+    jobs?: boolean;
+    evaluateMs?: number;
+    notifyMs?: number;
+    /** YALNIZ gelistirme/test: ozel/loopback webhook/SMTP hedeflerine izin (SSRF korumasi KAPANIR). Uretimde ASLA. */
+    allowPrivateTargets?: boolean;
+    /** YALNIZ gelistirme/test: http:// webhook izni. Uretimde HTTPS zorunlu. */
+    allowInsecureWebhooks?: boolean;
+    /** Test: DNS cozumleyici. */
+    lookup?: LookupAll;
+  };
 }
 
 export function buildApp(opts: AppOptions): FastifyInstance {
@@ -90,6 +112,26 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   registerStream(app, opts.pool, now, sessionCfg, bus, opts.stream);
   registerEnroll(app, opts.pool, now, opts.credentialKey, opts.spkiPins ?? [], limiters);
   registerRotate(app, opts.pool, now, opts.credentialKey, limiters);
+
+  // M5: uyarilar. "Ingest saglikli" devre kesicisi: ingest 5xx (veritabani/ingest sorunu) cevrimdisi alarmlarini bastirir.
+  const allowPrivate = opts.alerts?.allowPrivateTargets ?? false;
+  const allowInsecure = opts.alerts?.allowInsecureWebhooks ?? false;
+  const health = new IngestHealth(OFFLINE_GRACE_MS);
+  app.decorate("ingestHealth", health);
+  app.addHook("onResponse", async (req, reply) => {
+    if (req.url.startsWith("/agent/v1/ingest") && reply.statusCode >= 500) health.recordFailure(now());
+  });
+  registerAlertRoutes(app, opts.pool, now, limiters, { channelKey: opts.channelKey, allowPrivateTargets: allowPrivate, allowInsecureWebhooks: allowInsecure, lookup: opts.alerts?.lookup });
+  if (opts.alerts?.jobs) {
+    startAlertJobs(app, opts.pool, {
+      now, health, evaluateMs: opts.alerts.evaluateMs, notifyMs: opts.alerts.notifyMs,
+      notifier: {
+        secretKey: opts.channelKey, now,
+        webhook: { allowPrivate, allowInsecureHttp: allowInsecure, timeoutMs: 5000, lookup: opts.alerts.lookup },
+        email: { allowPrivate, allowInsecure: false, timeoutMs: 10_000, lookup: opts.alerts.lookup },
+      },
+    });
+  }
 
   app.setErrorHandler((err: Error & { statusCode?: number; code?: string }, _req, reply) => {
     if (err instanceof HttpError) return reply.status(err.status).headers(err.headers).send({ error: err.code, ...err.extra });

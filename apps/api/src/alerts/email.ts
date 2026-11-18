@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
 import type { SendResult } from "./webhook.js";
 
@@ -75,7 +76,7 @@ export async function sendEmail(cfg: EmailConfig, payload: unknown, opts: EmailO
     connectionTimeout: opts.timeoutMs, greetingTimeout: opts.timeoutMs, socketTimeout: opts.timeoutMs,
     disableFileAccess: true, disableUrlAccess: true,
     logger: false, debug: false,
-  } as nodemailer.TransportOptions);
+  } as SMTPTransport.Options);
 
   try {
     await transport.sendMail({

@@ -20,14 +20,14 @@ interface RuleRow {
 }
 interface DeviceRow { id: string; name: string; last_seen_at: Date | null }
 
-/** Her organizasyon icin yerlesik kurallari (yoksa) olusturur. Idempotent. */
-async function ensureBuiltins(c: pg.PoolClient): Promise<void> {
+/** Yerlesik kurallari (yoksa) olusturur: orgId verilirse yalniz o organizasyon, yoksa hepsi. Idempotent. */
+export async function ensureBuiltinRules(c: { query: pg.Pool["query"] }, orgId?: string): Promise<void> {
   for (const b of BUILTIN_RULES) {
     await c.query(
       `INSERT INTO alert_rules (org_id, name, metric, agg, window_seconds, operator, threshold, hysteresis, for_seconds, severity, builtin)
-       SELECT o.id, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 FROM orgs o
+       SELECT o.id, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 FROM orgs o WHERE ($11::uuid IS NULL OR o.id = $11::uuid)
        ON CONFLICT (org_id, builtin) WHERE builtin IS NOT NULL AND deleted_at IS NULL DO NOTHING`,
-      [b.name, b.metric, b.agg, b.window_seconds, b.operator, b.threshold, b.hysteresis, b.for_seconds, b.severity, b.builtin]);
+      [b.name, b.metric, b.agg, b.window_seconds, b.operator, b.threshold, b.hysteresis, b.for_seconds, b.severity, b.builtin, orgId ?? null]);
   }
 }
 
@@ -38,7 +38,7 @@ export async function evaluateAlerts(pool: pg.Pool, now: Date, ctx: EvalContext)
     const lock = await c.query<{ ok: boolean }>("SELECT pg_try_advisory_xact_lock($1) AS ok", [ALERT_LOCK_KEY]);
     if (!lock.rows[0]!.ok) { await c.query("ROLLBACK"); return { ran: false, fired: 0, resolved: 0 }; }
 
-    await ensureBuiltins(c);
+    await ensureBuiltinRules(c);
     const res: EvalResult = { ran: true, fired: 0, resolved: 0 };
 
     // Devre disi / silinmis kurallar: acik olaylar SESSIZCE kapanir (bildirim yok), durum temizlenir.

@@ -7,7 +7,7 @@ export interface SampleEvent {
 }
 
 declare module "fastify" {
-  interface FastifyInstance { sampleBus: SampleBus; registeredRoutes: string[] }
+  interface FastifyInstance { sampleBus: SampleBus; registeredRoutes: string[]; ingestHealth: import("./alerts/ingest-health.js").IngestHealth }
 }
 
 /**

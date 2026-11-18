@@ -88,6 +88,10 @@ describe("A kullanicisi B kaynaklarina erisemez", () => {
 /** Her /api/v1 rotasi ya org-verisi tasir (IDOR testlerinde kapsanmali) ya da org-notr olarak bilincli siniflandirilmali. */
 const IDOR_COVERED = new Set([
   "GET /api/v1/devices", "GET /api/v1/devices/:id", "GET /api/v1/devices/:id/metrics", "GET /api/v1/devices/:id/metric-names", "GET /api/v1/stream", "POST /api/v1/enrollment-tokens",
+  // M5 (IDOR/org izolasyonu testleri: test/alert-routes.test.ts + alert-evaluator.test.ts + alert-notifier.test.ts)
+  "GET /api/v1/alert-rules", "POST /api/v1/alert-rules", "PATCH /api/v1/alert-rules/:id", "DELETE /api/v1/alert-rules/:id",
+  "GET /api/v1/notification-channels", "POST /api/v1/notification-channels", "DELETE /api/v1/notification-channels/:id", "POST /api/v1/notification-channels/:id/test",
+  "GET /api/v1/incidents",
 ]);
 const ORG_NEUTRAL = new Set(["POST /api/v1/setup", "POST /api/v1/login", "POST /api/v1/logout", "GET /api/v1/me"]);
 
@@ -109,22 +113,22 @@ describe("rota kapsam denetimi (yeni rota unutulamaz)", () => {
 
   it("OTURUMSUZ hicbir korumali rota 401'den baska yanit vermez (tum rotalar otomatik taranir)", async () => {
     for (const route of apiRoutes()) {
-      const [method, path] = route.split(" ") as ["GET" | "POST", string];
+      const [method, path] = route.split(" ") as ["GET" | "POST" | "PATCH" | "DELETE", string];
       if (PUBLIC_API_PATHS.has(path)) continue;
       const url = path.replace(":id", UNKNOWN);
-      const r = await api(k, method, url, { body: method === "POST" ? {} : undefined });
+      const r = await api(k, method, url, { body: method !== "GET" ? {} : undefined });
       expect(r.statusCode, route).toBe(401);
     }
   });
 
   it("kodlu yol varyantlariyla da (/api/v%31/...) hicbir korumali rota oturumsuz 401'den baska yanit vermez, 500 yok (I-1)", async () => {
     for (const route of apiRoutes()) {
-      const [method, path] = route.split(" ") as ["GET" | "POST", string];
+      const [method, path] = route.split(" ") as ["GET" | "POST" | "PATCH" | "DELETE", string];
       if (PUBLIC_API_PATHS.has(path)) continue;
       const encoded = path.replace("/api/v1/", "/api/v%31/").replace(":id", UNKNOWN);
-      const r = await api(k, method, encoded, { body: method === "POST" ? {} : undefined });
+      const r = await api(k, method, encoded, { body: method !== "GET" ? {} : undefined });
       expect(r.statusCode, `${route} -> ${encoded}`).toBe(401);
-      const cased = await k.app.inject({ method, url: path.replace("/api/v1/", "/%61pi/v1/").replace(":id", UNKNOWN), headers: method === "POST" ? { origin: "https://panel.example.test", "content-type": "application/json" } : {}, ...(method === "POST" ? { payload: "{}" } : {}) });
+      const cased = await k.app.inject({ method, url: path.replace("/api/v1/", "/%61pi/v1/").replace(":id", UNKNOWN), headers: method !== "GET" ? { origin: "https://panel.example.test", "content-type": "application/json" } : {}, ...(method !== "GET" ? { payload: "{}" } : {}) });
       expect(cased.statusCode, `${route} (%61pi)`).toBe(401);
     }
   });
@@ -133,9 +137,9 @@ describe("rota kapsam denetimi (yeni rota unutulamaz)", () => {
     const c = await loginAs(k, "a@example.com", PW);
     await k.db.pool.query("DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email='a@example.com')");
     for (const route of apiRoutes()) {
-      const [method, path] = route.split(" ") as ["GET" | "POST", string];
+      const [method, path] = route.split(" ") as ["GET" | "POST" | "PATCH" | "DELETE", string];
       if (PUBLIC_API_PATHS.has(path)) continue;
-      const r = await api(k, method, path.replace(":id", devA), { cookie: c, body: method === "POST" ? {} : undefined });
+      const r = await api(k, method, path.replace(":id", devA), { cookie: c, body: method !== "GET" ? {} : undefined });
       expect(r.statusCode, route).toBe(401);
     }
   });
