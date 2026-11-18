@@ -77,7 +77,7 @@ function RulesPanel({ canWrite, channels }: { canWrite: boolean; channels: Notif
                       </label>
                     ))}
                     <div className="flex gap-2">
-                      <Button type="button" onClick={() => { const ids = editing.ids; setEditing(null); void run(m.patchRule.mutateAsync({ id: r.id, patch: { channel_ids: ids } })); }}>Kanalları kaydet</Button>
+                      <Button type="button" onClick={() => { const known = new Set(channels.map((c) => c.id)); const ids = editing.ids.filter((x) => known.has(x)); setEditing(null); void run(m.patchRule.mutateAsync({ id: r.id, patch: { channel_ids: ids } })); }}>Kanalları kaydet</Button>
                       <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Vazgeç</Button>
                     </div>
                   </fieldset>

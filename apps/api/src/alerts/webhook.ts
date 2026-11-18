@@ -30,7 +30,7 @@ export function signWebhook(secret: string, timestamp: string, body: string): st
 
 /** Alici tarafi dogrulamasi (belgelenmis ornek): sabit sureli karsilastirma + zaman toleransi (varsayilan 300 sn, iki yonlu; eski/replay istekler reddedilir). */
 export function verifyWebhookSignature(a: { secret: string; body: string; timestamp: string; signature: string; now: Date; toleranceSec?: number }): boolean {
-  if (!/^[0-9]{1,12}$/.test(a.timestamp)) return false;
+  if (!/^[0-9]{1,12}$/.test(a.timestamp) || !Number.isFinite(a.now.getTime()) || !Number.isFinite(a.toleranceSec ?? 0)) return false;
   if (Math.abs(a.now.getTime() / 1000 - Number(a.timestamp)) > (a.toleranceSec ?? SIGNATURE_TOLERANCE_SEC)) return false;
   const want = Buffer.from(signWebhook(a.secret, a.timestamp, a.body));
   const got = Buffer.from(a.signature);

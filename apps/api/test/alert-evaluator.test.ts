@@ -86,13 +86,18 @@ describe("degerlendirici: metrik kurali", () => {
     const dB = await device(orgB, "pcB");
     const bad = await rule(k.org, { name: "zehirli", metric: "cpu.total", window_seconds: 60, for_seconds: 0, threshold: 90 });
     const good = await rule(orgB, { name: "saglam", metric: "mem.used_pct", window_seconds: 60, for_seconds: 0, threshold: 50 });
-    await sample(k.org, dA, "cpu.total", 1e308, -5);
+    await sample(k.org, dA, "cpu.total", 1e308, -5);        // tasan deger: abs() filtresi eler (hata uretmez)
     await sample(k.org, dA, "cpu.total", 1e308, -4);
+    // GERCEK hata kaynagi: DB'ye dogrudan yazilmis gecersiz esik (NaN) -> step() RangeError; SAVEPOINT bunu yalitmali
+    const poison = await rule(k.org, { name: "nan-esik", metric: "cpu.total", threshold: NaN, for_seconds: 0 });
+    await sample(k.org, dA, "cpu.total", 50, -3);
     await sample(orgB, dB, "mem.used_pct", 80, -5);
     const errors: string[] = [];
     const r = await evaluateAlerts(k.db.pool, at(0), { ...ctx(), onRuleError: (id: string) => errors.push(id) });
     expect(r.ran).toBe(true);
-    expect(await incidents(good)).toHaveLength(1);
+    expect(errors).toContain(poison);                          // hatali kural raporlandi ve ATLANDI
+    expect(errors).not.toContain(good);
+    expect(await incidents(good)).toHaveLength(1);             // diger organizasyonun kurali etkilenmedi
     expect(await incidents(bad)).toHaveLength(0);
   });
 
