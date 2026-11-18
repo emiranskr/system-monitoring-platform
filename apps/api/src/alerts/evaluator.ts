@@ -108,7 +108,7 @@ async function evaluateRule(c: pg.PoolClient, rule: RuleRow, now: Date, ctx: Eva
         [rule.org_id, rule.id, d.id, rule.name, d.name, rule.metric, rule.severity, now, value]);
       if (inc.rows[0]) {
         res.fired++;
-        await enqueue(c, rule, d, inc.rows[0].id, "firing", value, now, null);
+        await enqueue(c, rule, d, inc.rows[0].id, "firing", value, now, null, now);
       }
     } else if (transition === "resolve") {
       const inc = await c.query<{ id: string; opened_at: Date }>(
@@ -116,7 +116,7 @@ async function evaluateRule(c: pg.PoolClient, rule: RuleRow, now: Date, ctx: Eva
         [rule.id, d.id, now, value]);
       if (inc.rows[0]) {
         res.resolved++;
-        await enqueue(c, rule, d, inc.rows[0].id, "resolved", value, inc.rows[0].opened_at, now);
+        await enqueue(c, rule, d, inc.rows[0].id, "resolved", value, inc.rows[0].opened_at, now, now);
       }
     } else if (next.state === "firing" && value !== null) {
       // Sureklilik: son/tepe deger guncellenir (bildirim yok).
@@ -146,7 +146,7 @@ async function metricValues(c: pg.PoolClient, rule: RuleRow, ids: string[], now:
   return new Map(r.rows.map((x) => [x.device_id, Number(x.v)]));
 }
 
-async function enqueue(c: pg.PoolClient, rule: RuleRow, d: DeviceRow, incidentId: string, kind: "firing" | "resolved", value: number | null, openedAt: Date, resolvedAt: Date | null): Promise<void> {
+async function enqueue(c: pg.PoolClient, rule: RuleRow, d: DeviceRow, incidentId: string, kind: "firing" | "resolved", value: number | null, openedAt: Date, resolvedAt: Date | null, at: Date): Promise<void> {
   const chans = (await c.query<{ id: string }>(
     "SELECT id FROM notification_channels WHERE org_id = $1 AND id = ANY($2::uuid[]) AND deleted_at IS NULL", [rule.org_id, rule.channel_ids])).rows;
   const payload = {
@@ -156,7 +156,7 @@ async function enqueue(c: pg.PoolClient, rule: RuleRow, d: DeviceRow, incidentId
   for (const ch of chans) {
     await c.query(
       `INSERT INTO notifications (org_id, incident_id, channel_id, kind, status, next_attempt_at, payload)
-       VALUES ($1,$2,$3,$4,'pending', now(), $5) ON CONFLICT (incident_id, kind, channel_id) DO NOTHING`,
-      [rule.org_id, incidentId, ch.id, kind, JSON.stringify(payload)]);
+       VALUES ($1,$2,$3,$4,'pending', $6, $5) ON CONFLICT (incident_id, kind, channel_id) DO NOTHING`,
+      [rule.org_id, incidentId, ch.id, kind, JSON.stringify(payload), at]);
   }
 }
