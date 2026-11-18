@@ -11,6 +11,8 @@
     "lint": "pnpm -r --if-present lint",
     "test:security": "pnpm --filter @sysmon/api test:security && pnpm --filter @sysmon/db test && node --test scripts/",
     "drill:backup": "node scripts/backup-restore-drill.mjs",
+    "demo": "node scripts/demo.mjs",
+    "demo:live": "node scripts/demo.mjs --live",
     "license-scan": "node scripts/license-scan.mjs"
   },
   "devDependencies": {
