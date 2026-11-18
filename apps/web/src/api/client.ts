@@ -17,7 +17,7 @@ export class NetworkError extends Error {
   constructor() { super("network"); this.name = "NetworkError"; }
 }
 
-export interface ApiInit { method?: "GET" | "POST"; json?: unknown; signal?: AbortSignal }
+export interface ApiInit { method?: "GET" | "POST" | "PATCH" | "DELETE"; json?: unknown; signal?: AbortSignal }
 
 /**
  * Tum panel API cagrilari buradan gecer: `credentials: "same-origin"` (oturum cerezi, JS token gormez), yanit zod semasiyla

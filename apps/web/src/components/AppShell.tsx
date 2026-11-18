@@ -19,6 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav aria-label="Ana gezinme" className="flex flex-wrap gap-1">
           <NavLink to="/" end className={link}>Genel bakış</NavLink>
           <NavLink to="/cihazlar" className={link}>Cihazlar</NavLink>
+          <NavLink to="/uyarilar" className={link}>Uyarılar</NavLink>
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <span className="max-w-48 truncate text-sm text-text-secondary">{s.user?.email}</span>
