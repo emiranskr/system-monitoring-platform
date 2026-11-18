@@ -26,7 +26,7 @@ test("iss: betikte iss'in verdigi parametreler var", () => {
   assert.match(install, /param\([\s\S]*\$SourceDir[\s\S]*\$InstallDir[\s\S]*\$Server\b/);
   assert.match(install, /\[string\[\]\]\$ServerPin/);
 });
-test("iss: girdi dogrulama (tirnak/ters bolu/bosluk/kabuk karakteri, https + ana makine, kimlik bilgisi, pin bicimi), sessiz kurulumda da; degerler cift tirnakla sarilir ('"' Pascal dizesi)", () => {
+test("iss: girdi dogrulama (tirnak/ters bolu/bosluk/kabuk karakteri, https + ana makine, kimlik bilgisi, pin bicimi), sessiz kurulumda da; degerler cift tirnakla sarilir", () => {
   assert.match(code, /function SafeText/);
   for (const ch of ["'\"'", "'\\'", "'`'", "'&'", "'|'", "';'"]) assert.ok(code.includes(`S[I] = ${ch}`), `${ch} reddedilmiyor`);
   assert.match(code, /Pos\('https:\/\/', LowerCase\(S\)\) = 1\) and \(Length\(S\) > 8\)/);
