@@ -36,7 +36,7 @@ Pencerede veri yoksa (cihaz sustu, ingest kesildi): **açık (FIRING) olay otoma
 - **Tekillik:** aynı anda **tek değerlendirici** (PostgreSQL advisory kilidi). Çok örnekli API **desteklenmiyor** (M6): zamanlanmış işler süreç içidir.
 
 ## Bilinen sınırlar (kapatılmış değil)
-- *Çözüldü* bildirimi, olay açıldığındaki değil kuralın **o anki** kanal listesine gider (kural arada düzenlenirse farklı kanallara düşebilir). `notifications`/`incidents` için saklama süresi (temizlik) politikası yok. Webhook imzasında zaman damgası yok (yalnız gövde HMAC; tekrar korumasi için `X-Sysmon-Dedupe`). Bunlar M6.
+- *Çözüldü* bildirimi, olay açıldığındaki değil kuralın **o anki** kanal listesine gider (kural arada düzenlenirse farklı kanallara düşebilir). `notifications`/`incidents` için saklama süresi (temizlik) politikası yok. Bunlar M6.
 - Kural önizlemesi yok (M6). Kural düzenleme arayüzünde etkin/devre dışı, silme ve **kanal bağlama** (yerleşik kurallar dahil) var; eşik değişikliği API ile `PATCH`. Yerleşik kurallar varsayılan olarak hiçbir kanala bağlı değildir: bildirim için her kurala "Kanalları düzenle" ile kanal bağlayın.
 - Panel kuralda yalnız "tüm cihazlar" kapsamı sunar (API cihaz listesi kabul eder).
 - Çözüldü bildirimi, kural devre dışı/silinirken **gönderilmez** (olay sessizce kapanır).
