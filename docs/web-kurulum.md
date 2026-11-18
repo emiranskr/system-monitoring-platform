@@ -40,5 +40,5 @@ E2E tarayıcı **indirmez**: makinedeki Google Chrome (`channel: "chrome"`) kull
 
 ## 4. Bilinen sınırlar
 - Canlı akış (SSE) **tek API örneği** içindir (süreç-içi olay yolu).
-- Üretim dağıtımı (statik sunum, CSP başlıkları, TLS) M6 kapsamındadır.
+- Üretim dağıtımı (statik sunum, CSP başlıkları, TLS): bkz. [uretim-dagitim.md](uretim-dagitim.md).
 - Ağ grafikleri `net.*.rx_bps/tx_bps` metriklerini BAYT/sn gösterir (metrik adı "bps" olsa da ajan bayt/sn gönderir).
