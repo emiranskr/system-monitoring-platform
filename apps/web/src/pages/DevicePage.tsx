@@ -20,7 +20,20 @@ const TABS = [
 /** GPU gorunen adi: device_info.gpus ile canonical_id eslesirse ad; yoksa kisa kimlik (ad UYDURULMAZ). */
 function gpuLabel(id: string, gpus: { canonical_id: string; name: string }[]): string {
   const hit = gpus.find((g) => g.canonical_id === id);
-  return hit ? hit.name : `GPU ${id.replace(/^gpu-/, "").slice(0, 8)}`;
+  return hit ? hit.name : `GPU ${gpuShortId(id)}`;
+}
+
+/** UUID tabanli kimlik: ilk 8 hane; PCI konumu: konumun tamami (kisaltilirsa farkli GPU'lar ayni etiketi alirdi). */
+function gpuShortId(id: string): string {
+  return id.startsWith("pci-") ? id.slice(4) : id.replace(/^gpu-/, "").slice(0, 8);
+}
+
+/** Basliklar ve grafik adlari BENZERSIZ olmali: ayni etiketi paylasan GPU'lara kisa kimlik eklenir. */
+function gpuLabels(ids: string[], gpus: { canonical_id: string; name: string }[]): Map<string, string> {
+  const base = ids.map((id) => [id, gpuLabel(id, gpus)] as const);
+  const counts = new Map<string, number>();
+  for (const [, l] of base) counts.set(l, (counts.get(l) ?? 0) + 1);
+  return new Map(base.map(([id, l]) => [id, (counts.get(l) ?? 0) > 1 ? `${l} (${gpuShortId(id)})` : l]));
 }
 
 const Missing = () => <p className="rounded-lg border border-border bg-surface-1 p-6 text-text-secondary">Bu donanımda yok.</p>;
@@ -99,8 +112,8 @@ export function DevicePage() {
         </Tabs.Content>
         <Tabs.Content value="gpu" className="mt-4 space-y-4">
           {waiting}
-          {m.gpus.map((g) => {
-            const label = gpuLabel(g.id, gpuInfo);
+          {m.gpus.map((g, _i, all) => {
+            const label = gpuLabels(all.map((x) => x.id), gpuInfo).get(g.id)!;
             return (
               <div key={g.id} className="space-y-2">
                 <h2 className="text-lg font-semibold">{label}</h2>

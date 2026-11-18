@@ -1,4 +1,4 @@
-# ADR 0005 — M4 G0 GPU spike (KISMI, yalnız mevcut makine)
+# ADR 0005 — M4 G0 GPU spike (KISMI, yalnız mevcut makine; NVML ölçümü için bkz. "Ek" bölümü)
 
 Tarih: 2026-11-17. Durum: **TASLAK / kısmi**. ChatGPT kararı: G0 yalnız bu makinede, salt okunur ve yönetici gerektirmeden yapılır; eksik profiller "doğrulanmadı" diye kaydedilir (varsayımla başarılı/başarısız ilan edilmez). Üretim kodu yok. Sürücü kurma/değiştirme, HVCI değiştirme, yönetici işlemi yok.
 

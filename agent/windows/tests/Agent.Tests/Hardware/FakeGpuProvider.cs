@@ -14,6 +14,7 @@ public sealed class FakeGpuProvider(string id, int priority, IReadOnlyList<GpuDe
     public bool BlockForever { get; set; }
     public bool IgnoreToken { get; set; }
     public Exception? ThrowOnRead { get; set; }
+    public Exception? ThrowOnDiscover { get; set; }
 
     private int _discoverCalls;
     public int DiscoverCalls => _discoverCalls;
@@ -24,6 +25,7 @@ public sealed class FakeGpuProvider(string id, int priority, IReadOnlyList<GpuDe
     {
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _discoverCalls);
+        if (ThrowOnDiscover is not null) throw ThrowOnDiscover;
         return Task.FromResult<IReadOnlyList<GpuDevice>>(Available ? Devices : []);
     }
 

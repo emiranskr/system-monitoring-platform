@@ -39,7 +39,7 @@ export function pickMetrics(names: string[]): PickedMetrics {
       const d = /^disk\.([^.]+)\.used_pct$/.exec(n);
       if (d) { out.disks.push({ letter: d[1]!, metric: n }); continue; }
       const g = /^gpu\.([^.]+)\.([a-z_]+)$/.exec(n);
-      const gf = g ? GPU_FIELDS[g[2]!] : undefined;
+      const gf = g && Object.hasOwn(GPU_FIELDS, g[2]!) ? GPU_FIELDS[g[2]!] : undefined; // prototip anahtarlari (constructor...) eslesmez
       if (g && gf) {
         const e = gpus.get(g[1]!) ?? { id: g[1]!, util: null, vramUsed: null, vramTotal: null, temp: null, power: null, fan: null, core: null, mem: null };
         e[gf] = n;

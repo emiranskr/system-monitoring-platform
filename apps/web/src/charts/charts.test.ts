@@ -107,4 +107,8 @@ describe("pickMetrics: GPU gruplari (gpu.<CanonicalId>.<alan>)", () => {
   it("sensor.* ve bilinmeyen alanlar GPU grubu olusturmaz", () => {
     expect(pickMetrics(["sensor.cpu_package_temp_c", "gpu.gpu-aaa.bilinmeyen_alan"]).gpus).toEqual([]);
   });
+  it("Object prototipi anahtarlari (constructor, __proto__, toString) hayalet GPU grubu olusturmaz", () => {
+    const m = pickMetrics(["gpu.evil.constructor", "gpu.evil.__proto__", "gpu.evil.toString", "gpu.evil.hasOwnProperty", "gpu.ok.util_pct"]);
+    expect(m.gpus.map((g) => g.id)).toEqual(["ok"]);
+  });
 });

@@ -246,6 +246,28 @@ public class SensorPipeTests
     // ---------- bozuk istemci / sunucu ----------
 
     [Fact]
+    public async Task Baglanip_hemen_kapanan_istemciler_sunucuyu_COKERTMEZ_sonraki_gecerli_istemci_hizmet_alir()
+    {
+        var name = Name();
+        var s = StartServer(name, new FakeSensorProvider());
+        try
+        {
+            for (var i = 0; i < 200; i++)
+            {
+                // baglan ve HICBIR sey yazmadan hemen kapat (sunucu WaitForConnection/Disconnect yarisi)
+                var raw = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
+                await raw.ConnectAsync(3000);
+                raw.Dispose();
+            }
+            Assert.False(s.Run.IsCompleted, "sunucu dongusu coktu/bitti: " + s.Run.Exception);
+            await using var c = await SensorPipeClient.ConnectAsync(name, ThisProcess, TimeSpan.FromSeconds(5), CancellationToken.None);
+            Assert.NotEmpty(await c.ReadAllAsync(TimeSpan.FromSeconds(5), CancellationToken.None));
+            Assert.False(s.Run.IsCompleted);
+        }
+        finally { await Stop(s); }
+    }
+
+    [Fact]
     public async Task Bozuk_istek_baglantiyi_dusurur_sunucu_yeni_istemciye_hizmet_vermeye_devam_eder()
     {
         var name = Name();

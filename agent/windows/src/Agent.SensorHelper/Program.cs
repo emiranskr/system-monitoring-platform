@@ -16,7 +16,7 @@ if (parent.HasExited) return 4;
 using var cts = new CancellationTokenSource();
 _ = parent.WaitForExitAsync().ContinueWith(_ => cts.Cancel()); // ebeveyn (agent) cikarsa yardimci da cikar: yetim kalmaz
 
-var server = new SensorPipeServer(a.PipeName, new NullSensorProvider(), a.AllowedSid, a.ParentPid, TimeSpan.FromSeconds(3));
+var server = new SensorPipeServer(a.PipeName, new NullSensorProvider(), a.AllowedSid, a.ParentPid, TimeSpan.FromSeconds(2)); // saglayici zaman asimi < istemci okuma zaman asimi (ProviderError yaniti Timeout yolundan once gelir)
 try { server.Start(); }
 catch (SensorPipeException) { return 3; }
 

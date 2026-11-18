@@ -39,7 +39,7 @@ public sealed class SensorHelperIntegrationTests : IDisposable
     }
 
     private static SupervisorOptions Fast() => new(
-        ConnectTimeout: TimeSpan.FromSeconds(8), ReadTimeout: TimeSpan.FromSeconds(3),
+        ConnectTimeout: TimeSpan.FromSeconds(30), ReadTimeout: TimeSpan.FromSeconds(5),
         BackoffBase: TimeSpan.FromMilliseconds(200), BackoffMax: TimeSpan.FromSeconds(2),
         MaxConsecutiveFailures: 5, CircuitCooldown: TimeSpan.FromSeconds(30), HealthyReadsToReset: 3, KillWait: TimeSpan.FromSeconds(5));
 
@@ -80,12 +80,27 @@ public sealed class SensorHelperIntegrationTests : IDisposable
     [Fact]
     public void Uretim_yardimcisi_ebeveyn_cikinca_kendiliginden_cikar_yetim_kalmaz()
     {
-        using var parent = Process.Start(new ProcessStartInfo("ping.exe", "-n 4 127.0.0.1") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true })!;
+        // Ebeveyn UZUN yasar (soguk baslatma yavas olsa da yardimci ayaga kalkar); yardimcinin calistigi pipe'a baglanarak kanitlanir,
+        // SONRA ebeveyn oldurulur ve yardimcinin kendiliginden ciktigi dogrulanir (zamanlamaya bagli degil).
+        using var parent = Process.Start(new ProcessStartInfo("ping.exe", "-n 120 127.0.0.1") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true })!;
         var name = SensorPipeServer.NewPipeName();
-        using var helper = Process.Start(new ProcessStartInfo(ProdHelper, $"--pipe {name} --parent-pid {parent.Id} --allow-sid {Me.Value}") { UseShellExecute = false, CreateNoWindow = true })!;
-        Assert.True(helper.WaitForExit(45000), "yardimci ebeveyn cikinca cikmadi");
-        Assert.Equal(0, helper.ExitCode);
-        parent.WaitForExit(2000);
+        using var helper = Process.Start(new ProcessStartInfo(ProdHelper, $"--pipe {name} --parent-pid {parent.Id} --allow-sid {Me.Value}") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true })!;
+        string Diag() => helper.HasExited ? $"cikis kodu {helper.ExitCode}; stderr: {helper.StandardError.ReadToEnd()}" : "yardimci calisiyor";
+        try
+        {
+            using (var probe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous))
+                probe.Connect(60_000);                      // yardimci calisiyor ve pipe'i acti
+            Assert.False(helper.HasExited, "yardimci ebeveyn hayattayken cikti: " + Diag());
+            parent.Kill();
+            parent.WaitForExit(10_000);
+            Assert.True(helper.WaitForExit(45_000), "yardimci ebeveyn cikinca cikmadi");
+            Assert.True(helper.ExitCode == 0, "beklenmeyen cikis: " + Diag());
+        }
+        finally
+        {
+            if (!parent.HasExited) parent.Kill();
+            if (!helper.HasExited) helper.Kill();
+        }
     }
 
     [Fact]

@@ -64,6 +64,7 @@ public sealed class GpuCollector : ICollector
     private async Task DiscoverAsync(CancellationToken ct)
     {
         var found = new List<(IGpuProvider, IReadOnlyList<GpuDevice>)>();
+        var failed = false;
         foreach (var p in _providers)
         {
             try
@@ -72,7 +73,13 @@ public sealed class GpuCollector : ICollector
                 found.Add((p, await p.DiscoverAsync(ct).ConfigureAwait(false)));
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch (Exception) { /* saglayici hatasi digerlerini ve agent'i etkilemez */ }
+            catch (Exception) { failed = true; /* saglayici hatasi digerlerini ve agent'i etkilemez */ }
+        }
+        if (failed)
+        {
+            // Gecici hata (orn. Busy): eksik/bos kesif sonucu eski listeyi SILMEZ; bir sonraki turda hemen yeniden denenir.
+            _needsRediscovery = true;
+            return;
         }
         _devices = GpuDeduplicator.Merge(found);
         _lastDiscovery = _clock();

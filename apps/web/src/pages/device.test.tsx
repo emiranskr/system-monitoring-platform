@@ -142,6 +142,24 @@ describe("sekmeler ve metrik kesfi", () => {
     expect(await screen.findByText(/Son 30 B ·/)).toBeInTheDocument();
   });
 
+  it("GPU etiketi cakismasi: ayni ad iki GPU'da ve PCI kimlikleri ayirt edilir (basliklar ve grafik adlari benzersiz)", async () => {
+    const A = "gpu-11111111-b075-6c98-9b95-3b6f3a465823";
+    const B = "gpu-22222222-b075-6c98-9b95-3b6f3a465823";
+    const P1 = "pci-0000-01-00-0";
+    const P2 = "pci-0000-02-00-0";
+    renderDevice({
+      names: [`gpu.${A}.util_pct`, `gpu.${B}.util_pct`, `gpu.${P1}.util_pct`, `gpu.${P2}.util_pct`],
+      detailBody: detail({ device_info: { ...INFO, gpus: [{ canonical_id: A, name: "RTX 5070" }, { canonical_id: B, name: "RTX 5070" }] } }),
+    });
+    const user = userEvent.setup();
+    await screen.findByRole("tablist");
+    await user.click(screen.getByRole("tab", { name: "GPU" }));
+    const headings = (await screen.findAllByRole("heading", { level: 2 })).map((h) => h.textContent);
+    expect(new Set(headings).size).toBe(headings.length);                       // hepsi benzersiz
+    expect(headings).toEqual(expect.arrayContaining(["RTX 5070 (11111111)", "RTX 5070 (22222222)", "GPU 0000-01-00-0", "GPU 0000-02-00-0"]));
+    expect(await screen.findByRole("img", { name: "RTX 5070 (11111111): kullanım" })).toBeInTheDocument();
+  });
+
   it("Depolama: her disk icin grafik; Ag: adaptor adi device_info'dan (Wi-Fi), rx/tx ayri", async () => {
     renderDevice({ names: ["cpu.total", "disk.c.used_pct", "disk.d.used_pct", "net.wifi0.rx_bps", "net.wifi0.tx_bps", "net.bilinmeyen.rx_bps"] });
     const user = userEvent.setup();

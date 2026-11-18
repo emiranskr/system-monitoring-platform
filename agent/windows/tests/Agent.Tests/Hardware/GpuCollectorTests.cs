@@ -109,6 +109,40 @@ public class GpuCollectorTests
     }
 
     [Fact]
+    public async Task Yeniden_kesif_araligi_TAM_dolunca_kesfeder_bir_tik_oncesinde_degil()
+    {
+        var c = new Clock();
+        var p = new FakeGpuProvider("fake", 1, [Dev()]) { Sample = Full };
+        var col = Make(c, p);
+        await col.CollectAsync(CancellationToken.None);
+        var calls = p.DiscoverCalls;
+        c.Advance(59.999);
+        await col.CollectAsync(CancellationToken.None);
+        Assert.Equal(calls, p.DiscoverCalls);
+        c.Advance(0.001);
+        await col.CollectAsync(CancellationToken.None);
+        Assert.Equal(calls + 1, p.DiscoverCalls);
+    }
+
+    [Fact]
+    public async Task Kesif_gecici_hata_Busy_verirse_onceki_cihaz_listesi_korunur_ve_hemen_yeniden_denenir()
+    {
+        var c = new Clock();
+        var p = new FakeGpuProvider("fake", 1, [Dev()]) { Sample = Full };
+        var col = Make(c, p);
+        Assert.NotEmpty(await col.CollectAsync(CancellationToken.None));
+
+        p.ThrowOnDiscover = new GpuProviderBusyException();
+        c.Advance(61);                                            // periyodik kesif zamani
+        Assert.NotEmpty(await col.CollectAsync(CancellationToken.None));   // liste SILINMEDI: metrikler akmaya devam eder
+
+        var calls = p.DiscoverCalls;
+        p.ThrowOnDiscover = null;
+        Assert.NotEmpty(await col.CollectAsync(CancellationToken.None));
+        Assert.Equal(calls + 1, p.DiscoverCalls);                 // basarisiz kesif sonrasi sonraki turda (60 sn beklemeden) yeniden denendi
+    }
+
+    [Fact]
     public async Task Gecersiz_CanonicalId_li_cihaz_metrik_uretmez()
     {
         var p = new FakeGpuProvider("fake", 1, [Dev("luid_0x1_phys_0")]) { Sample = Full };
