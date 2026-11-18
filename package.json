@@ -10,6 +10,7 @@
     "test": "pnpm -r --if-present test && node --test scripts/",
     "lint": "pnpm -r --if-present lint",
     "test:security": "pnpm --filter @sysmon/api test:security && pnpm --filter @sysmon/db test",
+    "drill:backup": "node scripts/backup-restore-drill.mjs",
     "license-scan": "node scripts/license-scan.mjs"
   },
   "devDependencies": {
