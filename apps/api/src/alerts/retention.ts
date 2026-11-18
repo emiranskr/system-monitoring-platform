@@ -20,11 +20,13 @@ export async function purgeAlertData(pool: pg.Pool, now: Date, o: RetentionOptio
   try {
     await c.query("BEGIN");
     const n = await c.query("DELETE FROM notifications WHERE status IN ('sent','failed') AND COALESCE(sent_at, created_at) < $1", [nCut]);
-    // Silinecek olaylar: cozulmus, eski ve bekleyen/gonderilen bildirimi OLMAYAN.
-    const doomed = `SELECT i.id FROM incidents i WHERE i.resolved_at IS NOT NULL AND i.resolved_at < $1
-                      AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.incident_id = i.id AND n.status IN ('pending','sending'))`;
-    await c.query(`DELETE FROM notifications WHERE incident_id IN (${doomed})`, [iCut]);
-    const i = await c.query(`DELETE FROM incidents WHERE id IN (${doomed})`, [iCut]);
+    // Silinecek olaylar BIR KEZ sabitlenir (READ COMMITTED'de iki ayri sorgu arada degisen bildirim durumuyla farkli sonuc verebilirdi):
+    // cozulmus, eski ve bekleyen/gonderilen bildirimi OLMAYAN. Gecici tablo islem sonunda kendiliginden silinir.
+    await c.query(`CREATE TEMP TABLE doomed_incidents ON COMMIT DROP AS
+                     SELECT i.id FROM incidents i WHERE i.resolved_at IS NOT NULL AND i.resolved_at < $1
+                       AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.incident_id = i.id AND n.status IN ('pending','sending'))`, [iCut]);
+    await c.query("DELETE FROM notifications WHERE incident_id IN (SELECT id FROM doomed_incidents)");
+    const i = await c.query("DELETE FROM incidents WHERE id IN (SELECT id FROM doomed_incidents)");
     await c.query("COMMIT");
     return { notifications: n.rowCount ?? 0, incidents: i.rowCount ?? 0 };
   } catch (e) {

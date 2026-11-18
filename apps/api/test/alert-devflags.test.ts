@@ -29,12 +29,13 @@ describe("sunucu sureci (derlenmis dist/server.js): uretimde dev bayragiyla BASL
     encoding: "utf8", timeout: 20_000,
     env: { PATH: process.env.PATH ?? "", DATABASE_URL: "postgres://x:y@127.0.0.1:1/z", CREDENTIAL_KEY: Buffer.alloc(32, 1).toString("base64"), PORT: "0", ...env },
   });
-  it.skipIf(!existsSync(server))("NODE_ENV=production + ALERT_ALLOW_PRIVATE_TARGETS=1 -> cikis kodu 2 ve acik hata (veritabanina baglanmadan)", () => {
+  it("derlenmis dist/server.js MEVCUT olmali (yoksa bu kontroller sessizce atlanmaz: build calistirin)", () => { expect(existsSync(server), "apps/api/dist/server.js yok: pnpm build").toBe(true); });
+  it("NODE_ENV=production + ALERT_ALLOW_PRIVATE_TARGETS=1 -> cikis kodu 2 ve acik hata (veritabanina baglanmadan)", () => {
     const r = run({ NODE_ENV: "production", ALERT_ALLOW_PRIVATE_TARGETS: "1" });
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/uretimde/i);
   });
-  it.skipIf(!existsSync(server))("NODE_ENV=production + ALERT_ALLOW_INSECURE_WEBHOOK=1 -> cikis kodu 2", () => {
+  it("NODE_ENV=production + ALERT_ALLOW_INSECURE_WEBHOOK=1 -> cikis kodu 2", () => {
     expect(run({ NODE_ENV: "production", ALERT_ALLOW_INSECURE_WEBHOOK: "1" }).status).toBe(2);
   });
 });

@@ -35,7 +35,7 @@ psql -U sysmon -d sysmon -c "SELECT timescaledb_post_restore()"
 pnpm build
 pnpm drill:backup
 ```
-Betik (`scripts/backup-restore-drill.mjs`): çalışan geliştirme DB konteynerinde **geçici** bir veritabanı kurar, örnek veri (hypertable + continuous aggregate) basar, `pg_dump` alır, **temiz geçici bir konteynerde** yukarıdaki sırayla geri yükler ve tüm tabloların satır sayılarını, hypertable ve continuous aggregate listelerini karşılaştırır. Herhangi bir adım hata verirse veya görüntüler uyuşmazsa **çıkış kodu 1** döner; başarısız geri yükleme başarılı gösterilmez (`scripts/drill-lib.test.mjs` bunu sınar). Geçici konteyner ve veritabanı her durumda silinir. Ön koşul: Docker ve `deploy-db-1` konteyneri çalışıyor (`DOCKER_DB_CONTAINER` ile ad değiştirilir).
+Betik (`scripts/backup-restore-drill.mjs`): çalışan geliştirme DB konteynerinde **geçici** bir veritabanı kurar, örnek veri (hypertable + continuous aggregate) basar, `pg_dump` alır, **temiz geçici bir konteynerde** yukarıdaki sırayla geri yükler ve tüm tabloların satır sayılarını, hypertable ve continuous aggregate listelerini karşılaştırır. Herhangi bir adım hata verirse veya görüntüler uyuşmazsa **çıkış kodu 1** döner; başarısız geri yükleme başarılı gösterilmez (`scripts/drill-lib.test.mjs` bunu sınar). Geçici konteyner ve veritabanı normal ve hata sonlanmalarında silinir (Ctrl-C ile kesilirse kalabilir: `docker ps -a` ile `sysmon-drill-*` konteynerini ve `sysmon_t_*` veritabanını elle silin). Ön koşul: Docker ve `deploy-db-1` konteyneri çalışıyor (`DOCKER_DB_CONTAINER` ile ad değiştirilir).
 
 Son doğrulanan sonuç: 17 tablo, `metric_samples` 600 satır, `metric_samples` hypertable'ı ve `metric_1m` continuous aggregate'i kaynak ile geri yüklenen veritabanında aynı.
 

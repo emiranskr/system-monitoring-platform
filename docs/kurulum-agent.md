@@ -16,7 +16,8 @@ dotnet publish agent/windows/src/Agent.Service -c Release -r win-x64 --self-cont
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DSourceDir=artifacts\agent /DAppVersion=0.1.0 agent\windows\installer\SysMonAgent.iss
 ```
 - `dotnet publish` komutu bu depoda **doğrulandı** (framework-bağımlı çıktı üretir; hedef makinede **.NET 10 Runtime** gerekir). `--self-contained true` seçeneği (çalışma zamanı gömülü) **denenmedi**.
-- `ISCC` derlemesi **denenmedi**.
+- `ISCC` derlemesi **denenmedi**. Inno Setup **6.3+** gerekir (`ArchitecturesAllowed=x64compatible`).
+- Betik çıkış kodu `[Code]` içinde `Exec` ile denetlenir; hata olunca `RaiseException` ile kurulum/kaldırma durur. Bu davranışın (özellikle ssPostInstall istisnasında dosya geri alma) gerçek Inno'da **doğrulanması kullanıcı kapısındadır** (matris #4, #8).
 
 ## Kullanıcı kapısı: kur / yükselt / kaldır + Defender/SmartScreen matrisi
 Her satır temiz bir Windows 11 (tercihen VM/anlık görüntü) üzerinde, **yönetici onayıyla** çalıştırılır. Sonuçlar `docs/ilerleme/kanit/` altına not edilir.
