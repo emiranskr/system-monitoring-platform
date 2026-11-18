@@ -100,6 +100,24 @@ describe("degerlendirici: metrik kurali", () => {
     expect(await incidents(good)).toHaveLength(1);             // diger organizasyonun kurali etkilenmedi
   });
 
+  it("D2: kural hatasi geri alinirsa fired/resolved SAYACI da geri alinir (olay yok, sayac 0)", async () => {
+    const d = await device(k.org, "pc1");
+    const ch = await channel(k.org);
+    const r = await rule(k.org, { channel_ids: [ch], for_seconds: 0 });
+    await sample(k.org, d, "cpu.total", 99, -5);
+    await q("CREATE OR REPLACE FUNCTION d2_fail() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'd2 test hatasi'; END $$ LANGUAGE plpgsql");
+    await q("CREATE TRIGGER d2_trg BEFORE INSERT ON notifications FOR EACH ROW EXECUTE FUNCTION d2_fail()");
+    const errors: string[] = [];
+    try {
+      const res = await evaluateAlerts(k.db.pool, at(0), { ...ctx(), onRuleError: (id: string) => errors.push(id) });
+      expect(errors).toEqual([r]);                        // enqueue patladi, kural atlandi
+      expect(await incidents(r)).toHaveLength(0);         // olay da geri alindi
+      expect(res.fired).toBe(0);                          // sayac gercek duruma uyar
+    } finally { await q("DROP TRIGGER d2_trg ON notifications"); await q("DROP FUNCTION d2_fail()"); }
+    const ok = await evaluateAlerts(k.db.pool, at(15), ctx());   // sorun gecince normal tetiklenir
+    expect(ok.fired).toBe(1);
+  });
+
   it("veri kesintisi (inceleme M-5): FIRING saatlerce acik kalir, RESOLVED bildirimi GITMEZ; PENDING sifirlanir (veri donunce for suresi bastan)", async () => {
     const d = await device(k.org, "pc1");
     const ch = await channel(k.org);

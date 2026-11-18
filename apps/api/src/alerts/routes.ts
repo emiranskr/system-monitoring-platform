@@ -169,11 +169,20 @@ export function registerAlertRoutes(app: FastifyInstance, pool: pg.Pool, now: ()
     const org = req.session!.orgId;
     if (!UUID_RE.test(req.params.id)) throw notFound();
     const t = now();
-    const r = await pool.query("UPDATE notification_channels SET deleted_at = $3 WHERE id = $1 AND org_id = $2 AND deleted_at IS NULL", [req.params.id, org, t]);
-    if (r.rowCount === 0) throw notFound();
-    await pool.query("UPDATE notifications SET status = 'failed', last_error = 'kanal silindi', lease_until = NULL WHERE channel_id = $1 AND org_id = $2 AND status IN ('pending','sending')", [req.params.id, org]);
-    await pool.query("UPDATE alert_rules SET channel_ids = array_remove(channel_ids, $1::uuid), updated_at = $3 WHERE org_id = $2 AND $1::uuid = ANY(channel_ids)", [req.params.id, org, t]);
-    await audit(pool, t, org, "notification_channel_deleted", { user_id: req.session!.userId, channel_id: req.params.id });
+    // TEK transaction: kanal silme + bekleyen bildirimleri kapatma + kural listesinden cikarma + denetim ya hep ya hic.
+    const c = await pool.connect();
+    try {
+      await c.query("BEGIN");
+      const r = await c.query("UPDATE notification_channels SET deleted_at = $3 WHERE id = $1 AND org_id = $2 AND deleted_at IS NULL", [req.params.id, org, t]);
+      if (r.rowCount === 0) { await c.query("ROLLBACK"); throw notFound(); }
+      await c.query("UPDATE notifications SET status = 'failed', last_error = 'kanal silindi', lease_until = NULL WHERE channel_id = $1 AND org_id = $2 AND status IN ('pending','sending')", [req.params.id, org]);
+      await c.query("UPDATE alert_rules SET channel_ids = array_remove(channel_ids, $1::uuid), updated_at = $3 WHERE org_id = $2 AND $1::uuid = ANY(channel_ids)", [req.params.id, org, t]);
+      await audit(c, t, org, "notification_channel_deleted", { user_id: req.session!.userId, channel_id: req.params.id });
+      await c.query("COMMIT");
+    } catch (e) {
+      await c.query("ROLLBACK").catch(() => undefined);
+      throw e;
+    } finally { c.release(); }
     return reply.status(204).send();
   });
 
@@ -214,6 +223,6 @@ export function registerAlertRoutes(app: FastifyInstance, pool: pg.Pool, now: ()
   });
 }
 
-async function audit(pool: pg.Pool, ts: Date, org: string, kind: string, detail: Record<string, unknown>): Promise<void> {
+async function audit(pool: pg.Pool | pg.PoolClient, ts: Date, org: string, kind: string, detail: Record<string, unknown>): Promise<void> {
   await pool.query("INSERT INTO audit_events (ts, org_id, kind, detail) VALUES ($1,$2,$3,$4)", [ts, org, kind, JSON.stringify(detail)]);
 }

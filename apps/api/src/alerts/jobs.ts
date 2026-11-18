@@ -3,6 +3,7 @@ import type pg from "pg";
 import { evaluateAlerts } from "./evaluator.js";
 import type { IngestHealth } from "./ingest-health.js";
 import { processNotifications, type NotifierDeps } from "./notifier.js";
+import { purgeAlertData } from "./retention.js";
 
 export interface AlertJobsOptions {
   now: () => Date;
@@ -46,7 +47,13 @@ export function startAlertJobs(app: FastifyInstance, pool: pg.Pool, o: AlertJobs
       .finally(() => { notifyRunning = false; });
   }, o.notifyMs ?? 5_000);
 
+  // Saklama temizligi: saatte bir (calisirken hata yalniz loglanir; olay/bildirim akisini etkilemez).
+  const purgeTimer = setInterval(() => {
+    void purgeAlertData(pool, o.now()).catch((e: Error) => app.log.error({ err: { message: e.message } }, "uyari saklama temizligi hatasi"));
+  }, 3_600_000);
+  purgeTimer.unref();
+
   evalTimer.unref();
   notifyTimer.unref();
-  app.addHook("onClose", async () => { clearInterval(evalTimer); clearInterval(notifyTimer); });
+  app.addHook("onClose", async () => { clearInterval(evalTimer); clearInterval(notifyTimer); clearInterval(purgeTimer); });
 }

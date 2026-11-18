@@ -226,6 +226,21 @@ describe("kanallar", () => {
     expect((await q("SELECT deleted_at FROM notification_channels WHERE id = $1", [bId])).rows[0].deleted_at).toBeNull();   // B'nin kanali silinmedi
   });
 
+  it("D1: kanal silme TEK transaction: ara adim basarisiz olursa kanal SILINMIS KALMAZ (kismi durum yok)", async () => {
+    const id = body(await api(k, "POST", "/api/v1/notification-channels", { cookie: owner, body: hook({ name: "atomik" }) })).id;
+    await api(k, "POST", `/api/v1/notification-channels/${id}/test`, { cookie: owner });
+    await q("CREATE OR REPLACE FUNCTION d1_fail() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'd1 test hatasi'; END $$ LANGUAGE plpgsql");
+    await q("CREATE TRIGGER d1_trg BEFORE UPDATE ON notifications FOR EACH ROW EXECUTE FUNCTION d1_fail()");
+    try {
+      const r = await api(k, "DELETE", `/api/v1/notification-channels/${id}`, { cookie: owner });
+      expect(r.statusCode).toBe(500);
+      expect((await q("SELECT deleted_at FROM notification_channels WHERE id = $1", [id])).rows[0].deleted_at).toBeNull();   // geri alindi
+    } finally {
+      await q("DROP TRIGGER d1_trg ON notifications"); await q("DROP FUNCTION d1_fail()");
+    }
+    expect((await api(k, "DELETE", `/api/v1/notification-channels/${id}`, { cookie: owner })).statusCode).toBe(204);   // tetikleyici yokken calisir
+  });
+
   it("test bildirimi: 202 kuyruga eklenir (olaysiz, kind=test); baska org 404; silinmis kanal 404; hiz siniri 429", async () => {
     const id = body(await api(k, "POST", "/api/v1/notification-channels", { cookie: admin, body: hook({ name: "test-kanali" }) })).id;
     const r = await api(k, "POST", `/api/v1/notification-channels/${id}/test`, { cookie: admin });

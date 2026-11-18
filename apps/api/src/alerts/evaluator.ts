@@ -55,8 +55,10 @@ export async function evaluateAlerts(pool: pg.Pool, now: Date, ctx: EvalContext)
       // Kural basina SAVEPOINT: tek bir kuralin hatasi (tasan deger, bozuk veri) diger kurallari/organizasyonlari durdurmaz.
       await c.query("SAVEPOINT rule_eval");
       try {
-        await evaluateRule(c, rule, now, ctx, res);
+        const local: EvalResult = { ran: true, fired: 0, resolved: 0 };   // sayaclar yalniz kural BASARILI olursa toplama eklenir (geri alinan olay sayilmaz)
+        await evaluateRule(c, rule, now, ctx, local);
         await c.query("RELEASE SAVEPOINT rule_eval");
+        res.fired += local.fired; res.resolved += local.resolved;
       } catch (e) {
         await c.query("ROLLBACK TO SAVEPOINT rule_eval");
         ctx.onRuleError?.(rule.id, e);
