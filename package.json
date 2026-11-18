@@ -9,6 +9,7 @@
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test && node --test scripts/",
     "lint": "pnpm -r --if-present lint",
+    "test:security": "pnpm --filter @sysmon/api test:security && pnpm --filter @sysmon/db test",
     "license-scan": "node scripts/license-scan.mjs"
   },
   "devDependencies": {

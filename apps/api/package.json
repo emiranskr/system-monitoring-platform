@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:security": "vitest run test/idor.test.ts test/session-guard.test.ts test/hardening.test.ts test/setup-login.test.ts test/enroll.test.ts test/enrollment-admin.test.ts test/ingest.test.ts test/fake-agent.test.ts test/rotate.test.ts test/devices.test.ts test/metrics-query.test.ts test/stream.test.ts test/ratelimit.test.ts test/alert-routes.test.ts test/alert-secrets.test.ts test/alert-netguard.test.ts test/alert-webhook.test.ts test/alert-devflags.test.ts test/alert-notifier.test.ts test/alert-evaluator.test.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/server.js"
   },
