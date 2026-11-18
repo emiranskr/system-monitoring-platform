@@ -26,7 +26,7 @@ test("iss: betikte iss'in verdigi parametreler var", () => {
   assert.match(install, /param\([\s\S]*\$SourceDir[\s\S]*\$InstallDir[\s\S]*\$Server\b/);
   assert.match(install, /\[string\[\]\]\$ServerPin/);
 });
-test("iss: girdi dogrulama (tirnak/ters bolu/bosluk/kabuk karakteri, https + ana makine, kimlik bilgisi, pin bicimi), sessiz kurulumda da; tek tirnak karakteriyle sarilir", () => {
+test("iss: girdi dogrulama (tirnak/ters bolu/bosluk/kabuk karakteri, https + ana makine, kimlik bilgisi, pin bicimi), sessiz kurulumda da; degerler cift tirnakla sarilir ('"' Pascal dizesi)", () => {
   assert.match(code, /function SafeText/);
   for (const ch of ["'\"'", "'\\'", "'`'", "'&'", "'|'", "';'"]) assert.ok(code.includes(`S[I] = ${ch}`), `${ch} reddedilmiyor`);
   assert.match(code, /Pos\('https:\/\/', LowerCase\(S\)\) = 1\) and \(Length\(S\) > 8\)/);
@@ -34,6 +34,7 @@ test("iss: girdi dogrulama (tirnak/ters bolu/bosluk/kabuk karakteri, https + ana
   assert.match(code, /Pos\('sha256\/', S\) = 1\) and \(Length\(S\) > 7\)/);
   assert.match(code, /function InitializeSetup[\s\S]*ValidServer\(ExpandConstant\('\{param:SERVER\|\}'\)\)/);
   assert.ok(!code.includes('""'), "cift tirnak kacisi (belirsiz) kullanilmamali");
+  assert.ok(code.includes(`' -Server "' + ServerValue() + '"'`) && code.includes(`' -ServerPin "' + PinValue() + '"'`));
 });
 test("iss: kaldirmada veri dizini VARSAYILAN korunur (Hayir varsayilan; sessizde silinmez)", () => {
   assert.match(code, /MB_YESNO or MB_DEFBUTTON2/);

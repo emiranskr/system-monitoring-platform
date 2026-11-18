@@ -103,8 +103,8 @@ function InitializeSetup(): Boolean;
 begin
   Result := True;
   { Sessiz kurulumda (/SERVER=, /PIN=) degerler de ayni dogrulamadan gecer }
-  if not ValidServer(ExpandConstant('{param:SERVER|}')) then begin Log('SERVER gecersiz'); Result := False; end
-  else if not ValidPin(ExpandConstant('{param:PIN|}')) then begin Log('PIN gecersiz'); Result := False; end;
+  if not ValidServer(ExpandConstant('{param:SERVER|}')) then begin Log('SERVER gecersiz'); if not WizardSilent then MsgBox('/SERVER degeri gecersiz (https:// ve ana makine).', mbError, MB_OK); Result := False; end
+  else if not ValidPin(ExpandConstant('{param:PIN|}')) then begin Log('PIN gecersiz'); if not WizardSilent then MsgBox('/PIN degeri gecersiz (sha256/<base64>).', mbError, MB_OK); Result := False; end;
 end;
 
 function ServerArgs(): String;
