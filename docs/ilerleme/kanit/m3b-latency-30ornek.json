@@ -2,13 +2,13 @@
   "olcum": "ingest istegi gonderimi -> ekranda cpu degerinin gorunmesi (SSE)",
   "ornek": 30,
   "birim": "ms",
-  "p50": 20,
-  "p95": 23,
-  "p99": 34,
-  "max": 34,
-  "min": 17,
+  "p50": 18,
+  "p95": 19,
+  "p99": 35,
+  "max": 35,
+  "min": 16,
   "butce_ms": 10000,
   "gecti": true,
   "sinirlar": "Tek makine (API, DB, Vite, tarayici ayni yerde); agent ornek toplama/batch yasi ve gercek ag gecikmesi DAHIL DEGIL; SSE yolu (yoklama degil). Resmi olcum degildir.",
-  "tarih": "2026-11-18T11:08:25.486Z"
+  "tarih": "2026-11-17T08:06:48.158Z"
 }
