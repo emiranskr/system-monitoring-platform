@@ -14,6 +14,9 @@ describe("OpenAPI 3.1 (zod'dan uretilir)", () => {
     expect(have).toEqual([
       "GET /api/v1/devices", "GET /api/v1/devices/{id}", "GET /api/v1/devices/{id}/metric-names", "GET /api/v1/devices/{id}/metrics",
       "GET /api/v1/me", "GET /api/v1/stream", "POST /api/v1/enrollment-tokens", "POST /api/v1/login", "POST /api/v1/logout",
+      "GET /api/v1/alert-rules", "POST /api/v1/alert-rules", "PATCH /api/v1/alert-rules/{id}", "DELETE /api/v1/alert-rules/{id}",
+      "GET /api/v1/notification-channels", "POST /api/v1/notification-channels", "DELETE /api/v1/notification-channels/{id}",
+      "POST /api/v1/notification-channels/{id}/test", "GET /api/v1/incidents",
     ].sort());
   });
 
