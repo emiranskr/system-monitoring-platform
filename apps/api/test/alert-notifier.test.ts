@@ -2,7 +2,8 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { processNotifications, type NotifierDeps } from "../src/alerts/notifier.js";
-import { encryptSecret } from "../src/alerts/secrets.js";
+import { randomUUID } from "node:crypto";
+import { channelAad, encryptSecret } from "../src/alerts/secrets.js";
 import { FakeSmtp } from "./fake-smtp.js";
 import { setupKit, type Kit } from "./kit.js";
 
@@ -26,7 +27,9 @@ const deps = (now: Date, over: Partial<NotifierDeps> = {}): NotifierDeps => ({
 
 async function webhookChannel(org = k.org, path = "/hook/TOKEN-SIRRI") {
   const cfg = { url: `http://127.0.0.1:${rport}${path}`, secret: "imza" };
-  return (await q("INSERT INTO notification_channels (org_id, name, type, config_enc, summary) VALUES ($1,'w','webhook',$2,'{}') RETURNING id", [org, encryptSecret(KEY, JSON.stringify(cfg))])).rows[0].id as string;
+  const id = randomUUID();
+  await q("INSERT INTO notification_channels (id, org_id, name, type, config_enc, summary) VALUES ($1,$2,'w','webhook',$3,'{}')", [id, org, encryptSecret(KEY, JSON.stringify(cfg), channelAad(org, id))]);
+  return id;
 }
 let incSeq = 0;
 async function notif(channel: string, over: { kind?: string; incident?: boolean; next?: Date; status?: string; lease?: Date | null; attempts?: number } = {}) {
@@ -234,9 +237,10 @@ describe("kalici bildirim kuyrugu: e-posta kanali", () => {
     await smtp.start();
     try {
       const cfg = { host: "127.0.0.1", port: smtp.port, user: "u", pass: "PAROLA-SIRRI", from: "alarm@example.com", to: ["ali@example.com"] };
-      const enc = encryptSecret(KEY, JSON.stringify(cfg));
+      const ch = randomUUID();
+      const enc = encryptSecret(KEY, JSON.stringify(cfg), channelAad(k.org, ch));
       expect(enc.toString("latin1")).not.toContain("PAROLA-SIRRI");
-      const ch = (await q("INSERT INTO notification_channels (org_id, name, type, config_enc, summary) VALUES ($1,'e','email',$2,'{}') RETURNING id", [k.org, enc])).rows[0].id as string;
+      await q("INSERT INTO notification_channels (id, org_id, name, type, config_enc, summary) VALUES ($1,$2,'e','email',$3,'{}')", [ch, k.org, enc]);
       const id = await notif(ch);
       await processNotifications(k.db.pool, deps(at(0)));
       expect((await row(id)).status).toBe("sent");

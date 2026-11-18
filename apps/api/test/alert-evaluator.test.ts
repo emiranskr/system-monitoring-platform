@@ -96,6 +96,31 @@ describe("degerlendirici: metrik kurali", () => {
     expect(await incidents(bad)).toHaveLength(0);
   });
 
+  it("veri kesintisi (inceleme M-5): FIRING saatlerce acik kalir, RESOLVED bildirimi GITMEZ; PENDING sifirlanir (veri donunce for suresi bastan)", async () => {
+    const d = await device(k.org, "pc1");
+    const ch = await channel(k.org);
+    const r = await rule(k.org, { channel_ids: [ch], for_seconds: 60, window_seconds: 30 });
+    await sample(k.org, d, "cpu.total", 95, -5);
+    await evaluateAlerts(k.db.pool, at(0), ctx());                       // PENDING
+    expect(await state(r, d)).toBe("pending");
+    await evaluateAlerts(k.db.pool, at(120), ctx());                     // pencerede veri yok -> PENDING sifirlanir
+    expect(await state(r, d)).toBe("ok");
+    await sample(k.org, d, "cpu.total", 96, 125);                        // veri geri geldi: sayac BASTAN (eski pending_since ile hemen tetiklenmez)
+    await evaluateAlerts(k.db.pool, at(130), ctx());
+    expect(await state(r, d)).toBe("pending");
+    expect(await incidents(r)).toHaveLength(0);
+    await sample(k.org, d, "cpu.total", 97, 170);
+    await evaluateAlerts(k.db.pool, at(195), ctx());
+    expect(await state(r, d)).toBe("firing");
+    expect(await incidents(r)).toHaveLength(1);
+    const before = (await notifs(r)).length;
+    for (const sec of [400, 3600, 7200]) await evaluateAlerts(k.db.pool, at(sec), ctx());   // veri YOK (cihaz sustu / ingest kesildi)
+    expect(await state(r, d)).toBe("firing");
+    expect((await incidents(r))[0].resolved_at).toBeNull();
+    expect((await notifs(r)).length).toBe(before);
+    expect((await notifs(r)).some((n) => n.kind === "resolved")).toBe(false);
+  });
+
   it("ayni anda iki kez degerlendirmek MUKERRER olay/bildirim uretmez", async () => {
     const d = await device(k.org, "pc1");
     const ch = await channel(k.org);

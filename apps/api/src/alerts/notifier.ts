@@ -1,6 +1,6 @@
 import type pg from "pg";
 import { sendEmail, type EmailConfig, type EmailOptions } from "./email.js";
-import { decryptSecret } from "./secrets.js";
+import { channelAad, decryptSecret } from "./secrets.js";
 import { sendWebhook, type SendResult, type WebhookConfig, type WebhookOptions } from "./webhook.js";
 
 export interface NotifierDeps {
@@ -84,7 +84,7 @@ async function deliver(pool: pg.Pool, n: Claimed, deps: NotifierDeps): Promise<S
     "SELECT type, config_enc FROM notification_channels WHERE id = $1 AND org_id = $2 AND deleted_at IS NULL", [n.channel_id, n.org_id])).rows[0];
   if (!ch) return { ok: false, retryable: false, error: "kanal yok veya silinmis" };
   let cfg: unknown;
-  try { cfg = JSON.parse(decryptSecret(deps.secretKey, ch.config_enc)); }
+  try { cfg = JSON.parse(decryptSecret(deps.secretKey, ch.config_enc, channelAad(n.org_id, n.channel_id))); }
   catch { return { ok: false, retryable: false, error: "kanal sirlari cozulemedi (anahtar yok/gecersiz)" }; }
   try {
     return ch.type === "webhook"

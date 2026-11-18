@@ -2,7 +2,7 @@
  * Uyari durum makinesi (saf, saat disaridan verilir): OK -> PENDING -> FIRING -> (RESOLVED = OK'e donus + "resolve" gecisi).
  * - PENDING: ihlal basladi, `forSeconds` dolana kadar bildirim YOK; ihlal biterse OK'e doner (sayac sifirlanir).
  * - FIRING: ihlal bitse bile HISTEREZIS bandinda (esik - histerezis) cozulmez; yalniz bandin otesine gecince cozulur.
- * - Veri yok (null): hicbir gecis olmaz (durum korunur; veri yoklugu cozme/tetikleme sebebi degildir).
+ * - Veri yok (null): FIRING korunur (asla otomatik cozulmez); PENDING sifirlanir (kesintisiz ihlal kaniti yok); OK kalir.
  * Yalnizca "fire" ve "resolve" gecisleri bildirim uretir: flapping tek bir yinelenen bildirim doguramaz.
  */
 export type Operator = ">" | ">=" | "<" | "<=";
@@ -33,7 +33,11 @@ function cleared(v: number, p: RuleParams): boolean {
 
 export function step(prev: MachineState, value: number | null, now: Date, p: RuleParams): Outcome {
   if (!Number.isFinite(p.threshold) || !(p.forSeconds >= 0) || !(p.hysteresis >= 0)) throw new RangeError("gecersiz kural parametresi");
-  if (value === null) return { next: prev, transition: null };
+  if (value === null) {
+    // Veri yok: FIRING ASLA otomatik cozulmez (cihaz sustu/ingest kesildi olabilir; cevrimdisi kurali ayrica yakalar). PENDING ise
+    // sifirlanir: "for" suresi KESINTISIZ ihlal ister, veri bosluguyla dolmus sayilmaz.
+    return prev.state === "pending" ? { next: { state: "ok", pendingSince: null }, transition: null } : { next: prev, transition: null };
+  }
   if (!Number.isFinite(value)) throw new RangeError("gecersiz deger");
 
   switch (prev.state) {

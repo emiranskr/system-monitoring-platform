@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { migrate } from "@sysmon/db";
 import { buildApp } from "./app.js";
 import { parseTrustProxy } from "./config.js";
+import { alertDevFlags } from "./alerts/devflags.js";
 import { parseChannelKey } from "./alerts/secrets.js";
 import { purgeExpiredCredentials } from "./enrollment.js";
 import { createPool } from "./pool.js";
@@ -21,6 +22,8 @@ if (!url || key.length !== 32) {
   console.error("DATABASE_URL ve CREDENTIAL_KEY (32 bayt, base64) zorunludur.");
   process.exit(2);
 }
+let devFlags;
+try { devFlags = alertDevFlags(process.env); } catch (e) { console.error((e as Error).message); process.exit(2); }
 const pool = createPool(url, (e) => console.error("DB havuz hatasi (bosta baglanti kopmasi olabilir):", e.message));
 if (process.env.MIGRATE === "1") console.log("migrate:", await migrate(pool));
 
@@ -34,8 +37,8 @@ const app = buildApp({
     jobs: true,
     evaluateMs: process.env.ALERT_EVALUATE_MS ? Math.max(500, Number(process.env.ALERT_EVALUATE_MS)) : undefined,   // varsayilan 15 sn; testler kisaltir
     notifyMs: process.env.ALERT_NOTIFY_MS ? Math.max(500, Number(process.env.ALERT_NOTIFY_MS)) : undefined,
-    allowPrivateTargets: process.env.ALERT_ALLOW_PRIVATE_TARGETS === "1",
-    allowInsecureWebhooks: process.env.ALERT_ALLOW_INSECURE_WEBHOOK === "1",
+    allowPrivateTargets: devFlags.allowPrivateTargets,
+    allowInsecureWebhooks: devFlags.allowInsecureWebhooks,
   },
   sampleIntervalSeconds: process.env.SAMPLE_INTERVAL_SECONDS ? Number(process.env.SAMPLE_INTERVAL_SECONDS) : undefined,
   spkiPins: (process.env.SPKI_PINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),

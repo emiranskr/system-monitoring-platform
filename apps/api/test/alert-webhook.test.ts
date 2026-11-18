@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { sendWebhook, type WebhookOptions } from "../src/alerts/webhook.js";
+import { sendWebhook, signWebhook, verifyWebhookSignature, type WebhookOptions } from "../src/alerts/webhook.js";
 
 interface Hit { method: string; url: string; headers: http.IncomingHttpHeaders; body: string }
 let hits: Hit[] = [];
@@ -61,7 +61,31 @@ describe("webhook gonderici", () => {
     expect(JSON.parse(h.body)).toEqual(payload);
     expect(h.headers["content-type"]).toContain("application/json");
     expect(h.headers["x-sysmon-dedupe"]).toBe("inc-1:firing");
-    expect(h.headers["x-sysmon-signature"]).toBe(`sha256=${createHmac("sha256", secret).update(h.body).digest("hex")}`);
+    // zaman damgali imza: HMAC(secret, "<ts>.<govde>"); ts ayri baslikta (saniye)
+    const ts = String(h.headers["x-sysmon-timestamp"]);
+    expect(ts).toMatch(/^[0-9]{10}$/);
+    expect(h.headers["x-sysmon-signature"]).toBe(`sha256=${createHmac("sha256", secret).update(`${ts}.${h.body}`).digest("hex")}`);
+    expect(verifyWebhookSignature({ secret, body: h.body, timestamp: ts, signature: String(h.headers["x-sysmon-signature"]), now: new Date() })).toBe(true);
+  });
+
+  it("imza dogrulama: eski (tolerans disi), degistirilmis govde/zaman damgasi, yanlis sir ve bozuk bicim REDDEDILIR; sinirda kabul", () => {
+    const secret = "s", body = '{"a":1}', now = new Date("2026-11-18T12:00:00Z");
+    const ts = String(Math.floor(now.getTime() / 1000));
+    const sig = signWebhook(secret, ts, body);
+    const v = (o: Partial<{ secret: string; body: string; timestamp: string; signature: string; now: Date; toleranceSec: number }> = {}) =>
+      verifyWebhookSignature({ secret, body, timestamp: ts, signature: sig, now, ...o });
+    expect(v()).toBe(true);
+    expect(v({ body: '{"a":2}' })).toBe(false);                                   // govde degisti
+    expect(v({ secret: "baska" })).toBe(false);
+    expect(v({ timestamp: String(Number(ts) + 1) })).toBe(false);                 // zaman damgasi degisti (imza ts'yi kapsar)
+    expect(v({ signature: "sha256=" + "0".repeat(64) })).toBe(false);
+    expect(v({ signature: "xx" })).toBe(false);
+    expect(v({ timestamp: "abc" })).toBe(false);
+    const old = new Date(now.getTime() + 301_000);                                // varsayilan tolerans 300 sn: eski istek (replay)
+    expect(v({ now: old })).toBe(false);
+    expect(v({ now: new Date(now.getTime() + 300_000) })).toBe(true);             // sinirda kabul
+    expect(v({ now: new Date(now.getTime() - 301_000) })).toBe(false);            // gelecekten gelen de reddedilir
+    expect(v({ now: old, toleranceSec: 600 })).toBe(true);
   });
 
   it("imza sirri yoksa imza basligi gonderilmez", async () => {

@@ -9,7 +9,7 @@ import { rateLimited, type Limiters } from "../ratelimit.js";
 import { requireRole } from "../session-guard.js";
 import { ensureBuiltinRules } from "./evaluator.js";
 import { DnsResolveError, resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
-import { encryptSecret, SecretsUnavailableError } from "./secrets.js";
+import { channelAad, encryptSecret, SecretsUnavailableError } from "./secrets.js";
 
 export interface AlertRoutesOptions {
   /** Kanal sir anahtari (32 bayt). Yoksa kanal OLUSTURMA 503 doner (sirlar duz metin saklanmaz). */
@@ -153,13 +153,14 @@ export function registerAlertRoutes(app: FastifyInstance, pool: pg.Pool, now: ()
       if (e instanceof SsrfError || e instanceof DnsResolveError) throw new HttpError(400, "blocked_target");
       throw e;
     }
+    const channelId = randomUUID();   // AAD kanal kimligini icerir: id satirdan ONCE uretilir
     let enc: Buffer;
-    try { enc = encryptSecret(o.channelKey, JSON.stringify(config)); }
+    try { enc = encryptSecret(o.channelKey, JSON.stringify(config), channelAad(org, channelId)); }
     catch (e) { if (e instanceof SecretsUnavailableError) throw new HttpError(503, "secrets_unavailable"); throw e; }
     const t = now();
     const r = await pool.query<{ id: string; created_at: Date }>(
-      "INSERT INTO notification_channels (org_id, name, type, config_enc, summary, created_by, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at",
-      [org, b.name, b.type, enc, JSON.stringify(summary), req.session!.userId, t]);
+      "INSERT INTO notification_channels (id, org_id, name, type, config_enc, summary, created_by, created_at) VALUES ($8,$1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at",
+      [org, b.name, b.type, enc, JSON.stringify(summary), req.session!.userId, t, channelId]);
     await audit(pool, t, org, "notification_channel_created", { user_id: req.session!.userId, channel_id: r.rows[0]!.id, type: b.type });   // sir yazilmaz
     return reply.status(201).send({ id: r.rows[0]!.id, name: b.name, type: b.type, summary, created_at: r.rows[0]!.created_at.toISOString() });
   });

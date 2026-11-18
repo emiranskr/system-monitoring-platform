@@ -59,9 +59,9 @@ describe("alert durum makinesi: OK -> PENDING -> FIRING -> RESOLVED", () => {
     expect(r.transition).toBe("resolve");
   });
 
-  it("veri yok (null): hicbir durumda gecis olmaz (PENDING/FIRING korunur)", () => {
+  it("veri yok (null): FIRING ASLA cozulmez/degismez; PENDING sifirlanir (kesintisiz ihlal kaniti yok); OK kalir", () => {
     const pending = step(OK, 95, T0, gt()).next;
-    expect(step(pending, null, at(15), gt())).toEqual({ next: pending, transition: null });
+    expect(step(pending, null, at(15), gt())).toEqual({ next: OK, transition: null });
     const firing: MachineState = { state: "firing", pendingSince: null };
     expect(step(firing, null, at(15), gt())).toEqual({ next: firing, transition: null });
     expect(step(OK, null, at(15), gt())).toEqual({ next: OK, transition: null });

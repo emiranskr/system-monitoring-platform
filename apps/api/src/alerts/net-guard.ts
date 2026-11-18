@@ -86,6 +86,8 @@ function prefixMatch(b: Uint8Array, base: number[], bits: number): boolean {
 
 const V6: [string, number][] = [
   ["::", 128], ["::1", 128], ["100::", 64], ["2001::", 32], ["2001:db8::", 32], ["2002::", 16], ["fc00::", 7], ["fe80::", 10], ["fec0::", 10], ["ff00::", 8],
+  // ::/8 (IPv4-uyumlu ::a.b.c.d dahil; mapped ve NAT64 ONCE ayri denetlenir), yerel NAT64 64:ff9b:1::/48, 3fff::/20 (belgelendirme)
+  ["::", 8], ["64:ff9b:1::", 48], ["3fff::", 20],
 ];
 
 function blockedV6(b: Uint8Array): boolean {

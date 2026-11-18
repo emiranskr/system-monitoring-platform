@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
 import { DnsResolveError, resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
@@ -15,10 +15,27 @@ export interface WebhookOptions {
   lookup?: LookupAll;
   /** Test: guvenilen CA (PEM). Uretimde sistem CA'lari; rejectUnauthorized ASLA kapatilmaz. */
   tlsCa?: string;
+  /** Test: saat (imza zaman damgasi). */
+  now?: () => Date;
 }
 export interface SendResult { ok: boolean; retryable: boolean; error?: string }
 
 const MAX_RESPONSE = 64 * 1024;
+export const SIGNATURE_TOLERANCE_SEC = 300;
+
+/** Imza: HMAC-SHA256(secret, "<unix-saniye>.<govde>"), "sha256=<hex>" bicimi; zaman damgasi X-Sysmon-Timestamp basligindadir ve imzaya DAHILDIR. */
+export function signWebhook(secret: string, timestamp: string, body: string): string {
+  return `sha256=${createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")}`;
+}
+
+/** Alici tarafi dogrulamasi (belgelenmis ornek): sabit sureli karsilastirma + zaman toleransi (varsayilan 300 sn, iki yonlu; eski/replay istekler reddedilir). */
+export function verifyWebhookSignature(a: { secret: string; body: string; timestamp: string; signature: string; now: Date; toleranceSec?: number }): boolean {
+  if (!/^[0-9]{1,12}$/.test(a.timestamp)) return false;
+  if (Math.abs(a.now.getTime() / 1000 - Number(a.timestamp)) > (a.toleranceSec ?? SIGNATURE_TOLERANCE_SEC)) return false;
+  const want = Buffer.from(signWebhook(a.secret, a.timestamp, a.body));
+  const got = Buffer.from(a.signature);
+  return want.length === got.length && timingSafeEqual(want, got);
+}
 
 const fail = (retryable: boolean, error: string): SendResult => ({ ok: false, retryable, error });
 
@@ -38,11 +55,12 @@ export async function sendWebhook(cfg: WebhookConfig, payload: unknown, opts: We
   catch (e) { return fail(!(e instanceof SsrfError), e instanceof SsrfError || e instanceof DnsResolveError ? e.message : "hedef cozumlenemedi"); }
 
   const body = JSON.stringify(payload);
+  const ts = String(Math.floor((opts.now?.() ?? new Date()).getTime() / 1000));
   const dedupe = (payload as { dedupe_key?: string } | null)?.dedupe_key;
   const headers: Record<string, string | number> = {
     "content-type": "application/json", "content-length": Buffer.byteLength(body), "user-agent": "sysmon-alerts/1",
     ...(dedupe ? { "x-sysmon-dedupe": String(dedupe) } : {}),
-    ...(cfg.secret ? { "x-sysmon-signature": `sha256=${createHmac("sha256", cfg.secret).update(body).digest("hex")}` } : {}),
+    ...(cfg.secret ? { "x-sysmon-timestamp": ts, "x-sysmon-signature": signWebhook(cfg.secret, ts, body) } : {}),
   };
   const lib = u.protocol === "https:" ? https : http;
   const max = opts.maxResponseBytes ?? MAX_RESPONSE;

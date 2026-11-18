@@ -14,6 +14,8 @@ describe("SSRF: engellenen IP araliklari", () => {
   it.each([
     "::", "::1", "fe80::1", "febf::1", "fc00::1", "fd12:3456::1", "ff02::1", "2001:db8::1", "2001::1", "100::1", "fec0::1",
     "::ffff:127.0.0.1", "::ffff:10.0.0.1", "::ffff:7f00:1", "0:0:0:0:0:ffff:a00:1", "::ffff:169.254.169.254", "64:ff9b::7f00:1", "64:ff9b::a00:1", "2002:7f00:1::1",
+    // inceleme M-1: IPv4-uyumlu (::/96), yerel NAT64 (64:ff9b:1::/48), 3fff::/20 ve ::/8 icindeki her sey
+    "::7f00:1", "::a00:1", "::a9fe:a9fe", "::808:808", "0:0:0:0:0:0:7f00:1", "64:ff9b:1::1", "64:ff9b:1:ffff::1", "3fff::1", "3fff:fff:ffff::1", "::1:2:3:4",
   ])("IPv6 %s engellenir", (ip) => { expect(isBlockedIp(ip)).toBe(true); });
 
   it.each(["2606:4700:4700::1111", "2001:4860:4860::8888", "::ffff:8.8.8.8", "64:ff9b::808:808"])("genel IPv6 %s engellenmez", (ip) => {
