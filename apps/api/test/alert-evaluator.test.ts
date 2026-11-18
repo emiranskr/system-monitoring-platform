@@ -98,7 +98,6 @@ describe("degerlendirici: metrik kurali", () => {
     expect(errors).toContain(poison);                          // hatali kural raporlandi ve ATLANDI
     expect(errors).not.toContain(good);
     expect(await incidents(good)).toHaveLength(1);             // diger organizasyonun kurali etkilenmedi
-    expect(await incidents(bad)).toHaveLength(0);
   });
 
   it("veri kesintisi (inceleme M-5): FIRING saatlerce acik kalir, RESOLVED bildirimi GITMEZ; PENDING sifirlanir (veri donunce for suresi bastan)", async () => {

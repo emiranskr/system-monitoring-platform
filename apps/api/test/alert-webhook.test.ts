@@ -86,6 +86,9 @@ describe("webhook gonderici", () => {
     expect(v({ now: new Date(now.getTime() + 300_000) })).toBe(true);             // sinirda kabul
     expect(v({ now: new Date(now.getTime() - 301_000) })).toBe(false);            // gelecekten gelen de reddedilir
     expect(v({ now: old, toleranceSec: 600 })).toBe(true);
+    expect(v({ now: new Date(NaN) })).toBe(false);                                // gecersiz saat tolerans kontrolunu atlatamaz
+    expect(v({ toleranceSec: NaN })).toBe(false);
+    expect(v({ toleranceSec: Infinity })).toBe(false);
   });
 
   it("imza sirri yoksa imza basligi gonderilmez", async () => {

@@ -160,6 +160,18 @@ describe("Uyarilar sayfasi", () => {
     expect(m.calls.find((c) => c.method === "PATCH")!.body).toEqual({ channel_ids: [C1] });
   });
 
+  it("I-4: kanal listesi bos/yuklenmemisken kaydetmek kuralin MEVCUT kanal baglantilarini SILMEZ", async () => {
+    const m = renderAlerts({ rules: [rule({ channel_ids: [C1] })], channels: [], extra: {
+      [`PATCH /api/v1/alert-rules/${R1}`]: () => ({ status: 200, body: rule({ channel_ids: [C1] }) }),
+    } });
+    const user = userEvent.setup();
+    await tab("Kurallar");
+    await user.click(await screen.findByRole("button", { name: /kanalları düzenle/i }));
+    await user.click(screen.getByRole("button", { name: /kanalları kaydet/i }));
+    await waitFor(() => expect(m.calls.find((c) => c.method === "PATCH")).toBeTruthy());
+    expect(m.calls.find((c) => c.method === "PATCH")!.body).toEqual({ channel_ids: [C1] });
+  });
+
   it("I-4: viewer 'Kanallari duzenle' goremez", async () => {
     renderAlerts({ role: "viewer", channels: [channel()] });
     await tab("Kurallar");
