@@ -36,7 +36,7 @@ Pencerede veri yoksa (cihaz sustu, ingest kesildi): **açık (FIRING) olay otoma
 - **Tekillik:** aynı anda **tek değerlendirici** (PostgreSQL advisory kilidi). Çok örnekli API **desteklenmiyor** (M6): zamanlanmış işler süreç içidir.
 
 ## Bilinen sınırlar (kapatılmış değil)
-- *Çözüldü* bildirimi, olay açıldığındaki değil kuralın **o anki** kanal listesine gider (kural arada düzenlenirse farklı kanallara düşebilir). `notifications`/`incidents` için saklama süresi (temizlik) politikası yok. Bunlar M6.
+- *Çözüldü* bildirimi, olay açıldığındaki değil kuralın **o anki** kanal listesine gider (kural arada düzenlenirse farklı kanallara düşebilir). **Saklama (M6):** her saat temizlik — `sent`/`failed` bildirimler 30 günden, çözülmüş olaylar 180 günden eskiyse silinir; açık olaylar ve bekleyen/gönderilen bildirimi olan olaylar asla silinmez (`apps/api/src/alerts/retention.ts`). Kanal silme tek transaction'dır. Anahtar (`CHANNEL_KEY`) yedekleme ve kayıp uyarıları: [yedekleme.md](yedekleme.md). Bunlar M6.
 - Kural önizlemesi yok (M6). Kural düzenleme arayüzünde etkin/devre dışı, silme ve **kanal bağlama** (yerleşik kurallar dahil) var; eşik değişikliği API ile `PATCH`. Yerleşik kurallar varsayılan olarak hiçbir kanala bağlı değildir: bildirim için her kurala "Kanalları düzenle" ile kanal bağlayın.
 - Panel kuralda yalnız "tüm cihazlar" kapsamı sunar (API cihaz listesi kabul eder).
 - Çözüldü bildirimi, kural devre dışı/silinirken **gönderilmez** (olay sessizce kapanır).
