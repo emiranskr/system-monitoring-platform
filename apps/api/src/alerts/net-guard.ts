@@ -10,6 +10,10 @@ import net from "node:net";
 export class SsrfError extends Error {
   constructor(message: string) { super(message); }
 }
+/** Ad cozumlenemedi (DNS hatasi/bos yanit): engelli adres DEGIL; gecici olabilir, bildirim gonderiminde yeniden denenir. */
+export class DnsResolveError extends Error {
+  constructor(message: string) { super(message); }
+}
 
 // [baslangic (32 bit), prefix]
 const V4: [string, number][] = [
@@ -118,8 +122,8 @@ export async function resolveSafe(host: string, opts: { allowPrivate: boolean; l
   }
   let addrs: { address: string; family: number }[];
   try { addrs = await (opts.lookup ?? defaultLookup)(bare); }
-  catch { throw new SsrfError("hedef ad cozumlenemedi"); }
-  if (addrs.length === 0) throw new SsrfError("hedef ad cozumlenemedi");
+  catch { throw new DnsResolveError("hedef ad cozumlenemedi"); }
+  if (addrs.length === 0) throw new DnsResolveError("hedef ad cozumlenemedi");
   if (!opts.allowPrivate && addrs.some((a) => isBlockedIp(a.address))) throw new SsrfError("hedef adres engelli (ozel/loopback/link-local/rezerve)");
   const first = addrs[0]!;
   return { address: first.address, family: net.isIPv4(first.address) ? 4 : 6 };

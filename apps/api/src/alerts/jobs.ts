@@ -31,7 +31,7 @@ export function startAlertJobs(app: FastifyInstance, pool: pg.Pool, o: AlertJobs
       try {
         try { await pool.query("SELECT 1"); }
         catch { o.health.recordFailure(o.now()); return; }
-        await evaluateAlerts(pool, o.now(), { startedAt, ingestHealthy: o.health.isHealthy(o.now()) });
+        await evaluateAlerts(pool, o.now(), { startedAt, ingestHealthy: o.health.isHealthy(o.now()), onRuleError: (ruleId, e) => app.log.error({ rule_id: ruleId, err: { message: (e as Error).message } }, "uyari kurali degerlendirilemedi (atlandi)") });
       } catch (e) {
         app.log.error({ err: { message: (e as Error).message } }, "uyari degerlendirme hatasi");
       } finally { evalRunning = false; }

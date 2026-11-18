@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
-import { resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
+import { DnsResolveError, resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
 
 export interface WebhookConfig { url: string; /** Istege bagli HMAC-SHA256 imza sirri (X-Sysmon-Signature). */ secret?: string }
 export interface WebhookOptions {
@@ -35,7 +35,7 @@ export async function sendWebhook(cfg: WebhookConfig, payload: unknown, opts: We
 
   let addr;
   try { addr = await resolveSafe(u.hostname, { allowPrivate: opts.allowPrivate, lookup: opts.lookup }); }
-  catch (e) { return fail(!(e instanceof SsrfError), e instanceof SsrfError ? e.message : "hedef cozumlenemedi"); }
+  catch (e) { return fail(!(e instanceof SsrfError), e instanceof SsrfError || e instanceof DnsResolveError ? e.message : "hedef cozumlenemedi"); }
 
   const body = JSON.stringify(payload);
   const dedupe = (payload as { dedupe_key?: string } | null)?.dedupe_key;

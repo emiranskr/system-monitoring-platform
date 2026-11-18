@@ -8,7 +8,7 @@ import { jsonBody } from "../http-util.js";
 import { rateLimited, type Limiters } from "../ratelimit.js";
 import { requireRole } from "../session-guard.js";
 import { ensureBuiltinRules } from "./evaluator.js";
-import { resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
+import { DnsResolveError, resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
 import { encryptSecret, SecretsUnavailableError } from "./secrets.js";
 
 export interface AlertRoutesOptions {
@@ -95,7 +95,8 @@ export function registerAlertRoutes(app: FastifyInstance, pool: pg.Pool, now: ()
     });
     if (!full.success) throw badRequest();
     const b: AlertRuleInput = full.data;
-    await checkRefs(pool, org, b.scope_device_ids, b.channel_ids);
+    // Yalniz BU istekte degisen/verilen basvurular dogrulanir (silinmis eski kanal, ilgisiz bir PATCH'i engellemez).
+    await checkRefs(pool, org, p.data.scope_device_ids === undefined ? null : b.scope_device_ids, p.data.channel_ids === undefined ? [] : b.channel_ids);
     const r = await pool.query<RuleRow>(
       `UPDATE alert_rules SET name=$3, metric=$4, agg=$5, window_seconds=$6, operator=$7, threshold=$8, hysteresis=$9, for_seconds=$10, severity=$11,
          scope_device_ids=$12, channel_ids=$13, enabled=$14, updated_at=$15
@@ -149,7 +150,7 @@ export function registerAlertRoutes(app: FastifyInstance, pool: pg.Pool, now: ()
         summary = { host: b.host, port: b.port, recipients: b.to.length };
       }
     } catch (e) {
-      if (e instanceof SsrfError) throw new HttpError(400, "blocked_target");
+      if (e instanceof SsrfError || e instanceof DnsResolveError) throw new HttpError(400, "blocked_target");
       throw e;
     }
     let enc: Buffer;
@@ -170,6 +171,7 @@ export function registerAlertRoutes(app: FastifyInstance, pool: pg.Pool, now: ()
     const r = await pool.query("UPDATE notification_channels SET deleted_at = $3 WHERE id = $1 AND org_id = $2 AND deleted_at IS NULL", [req.params.id, org, t]);
     if (r.rowCount === 0) throw notFound();
     await pool.query("UPDATE notifications SET status = 'failed', last_error = 'kanal silindi', lease_until = NULL WHERE channel_id = $1 AND org_id = $2 AND status IN ('pending','sending')", [req.params.id, org]);
+    await pool.query("UPDATE alert_rules SET channel_ids = array_remove(channel_ids, $1::uuid), updated_at = $3 WHERE org_id = $2 AND $1::uuid = ANY(channel_ids)", [req.params.id, org, t]);
     await audit(pool, t, org, "notification_channel_deleted", { user_id: req.session!.userId, channel_id: req.params.id });
     return reply.status(204).send();
   });

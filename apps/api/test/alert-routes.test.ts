@@ -110,6 +110,19 @@ describe("kurallar", () => {
     expect((await api(k, "PATCH", `/api/v1/alert-rules/${created.id}`, { cookie: owner, body: { metric: "x.y" } })).statusCode).toBe(400);
   });
 
+  it("I-1: kullanilan kanal silinse de kural PATCH'lenebilir; kanal kuralin listesinden cikar; silinmis kanal yeni baglanamaz", async () => {
+    const ch = body(await api(k, "POST", "/api/v1/notification-channels", { cookie: owner, body: hook({ name: "gecici" }) })).id;
+    const r = AlertRuleSchema.parse(body(await api(k, "POST", "/api/v1/alert-rules", { cookie: owner, body: rule({ name: "kanalli", channel_ids: [ch] }) })));
+    expect((await api(k, "DELETE", `/api/v1/notification-channels/${ch}`, { cookie: owner })).statusCode).toBe(204);
+    const listed = body(await api(k, "GET", "/api/v1/alert-rules", { cookie: owner })).rules.find((x: { id: string }) => x.id === r.id);
+    expect(listed.channel_ids).toEqual([]);
+    expect((await api(k, "PATCH", `/api/v1/alert-rules/${r.id}`, { cookie: owner, body: { enabled: false } })).statusCode).toBe(200);
+    // DB'de eski (kirli) referans kalmis olsa bile yalniz enabled PATCH'i basarili olur
+    await q("UPDATE alert_rules SET channel_ids = ARRAY[$2::uuid] WHERE id = $1", [r.id, ch]);
+    expect((await api(k, "PATCH", `/api/v1/alert-rules/${r.id}`, { cookie: owner, body: { enabled: true } })).statusCode).toBe(200);
+    expect((await api(k, "PATCH", `/api/v1/alert-rules/${r.id}`, { cookie: owner, body: { channel_ids: [ch] } })).statusCode).toBe(400);
+  });
+
   it("yerlesik kural: esik/etkin degisir; metrik/ad degismez (400); silinemez (409)", async () => {
     const offline = AlertRulesResponseSchema.parse(body(await api(k, "GET", "/api/v1/alert-rules", { cookie: owner }))).rules.find((x) => x.builtin === "offline")!;
     expect((await api(k, "PATCH", `/api/v1/alert-rules/${offline.id}`, { cookie: owner, body: { threshold: 120, enabled: false } })).statusCode).toBe(200);

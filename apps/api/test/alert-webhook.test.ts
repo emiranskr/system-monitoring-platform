@@ -100,6 +100,12 @@ describe("webhook gonderici", () => {
     expect(r.ok).toBe(true);
   });
 
+  it("I-3: gecici DNS hatasi (EAI_AGAIN) YENIDEN DENENEBILIR; engelli adres kalici", async () => {
+    const dnsFail = async () => { throw Object.assign(new Error("EAI_AGAIN"), { code: "EAI_AGAIN" }); };
+    expect(await sendWebhook({ url: "https://hooks.example.com/x" }, payload, { allowPrivate: false, timeoutMs: 1000, lookup: dnsFail })).toMatchObject({ ok: false, retryable: true });
+    expect(await sendWebhook({ url: "https://hooks.example.com/x" }, payload, { allowPrivate: false, timeoutMs: 1000, lookup: async () => [{ address: "10.0.0.5", family: 4 }] })).toMatchObject({ ok: false, retryable: false });
+  });
+
   it("SSRF: allowPrivate kapaliyken loopback/ozel hedefe ISTEK GITMEZ ve kalici hata (yeniden deneme yok)", async () => {
     reset();
     const r = await sendWebhook({ url: url() }, payload, { allowPrivate: false, allowInsecureHttp: true, timeoutMs: 1000 });

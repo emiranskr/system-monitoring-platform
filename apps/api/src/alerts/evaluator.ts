@@ -11,6 +11,8 @@ export interface EvalContext {
   /** "Ingest saglikli" devre kesicisi: false ise cevrimdisi alarmlari bastirilir. */
   ingestHealthy: boolean;
   graceMs?: number;
+  /** Bir kural degerlendirilirken hata olursa (ornegin sayisal tasma) cagrilir; kural atlanir, diger kurallar surer. */
+  onRuleError?: (ruleId: string, err: unknown) => void;
 }
 export interface EvalResult { ran: boolean; fired: number; resolved: number }
 
@@ -50,7 +52,15 @@ export async function evaluateAlerts(pool: pg.Pool, now: Date, ctx: EvalContext)
     const rules = (await c.query<RuleRow>("SELECT * FROM alert_rules WHERE deleted_at IS NULL AND enabled ORDER BY created_at, id")).rows;
     for (const rule of rules) {
       if (!isAllowedMetric(rule.metric)) continue;      // izin listesi disi (DB'ye dogrudan yazilmis) kural: atla
-      await evaluateRule(c, rule, now, ctx, res);
+      // Kural basina SAVEPOINT: tek bir kuralin hatasi (tasan deger, bozuk veri) diger kurallari/organizasyonlari durdurmaz.
+      await c.query("SAVEPOINT rule_eval");
+      try {
+        await evaluateRule(c, rule, now, ctx, res);
+        await c.query("RELEASE SAVEPOINT rule_eval");
+      } catch (e) {
+        await c.query("ROLLBACK TO SAVEPOINT rule_eval");
+        ctx.onRuleError?.(rule.id, e);
+      }
     }
     await c.query("COMMIT");
     return res;
@@ -137,12 +147,12 @@ async function metricValues(c: pg.PoolClient, rule: RuleRow, ids: string[], now:
   const like = metricLikePattern(rule.metric);
   const from = new Date(now.getTime() - rule.window_seconds * 1000);
   const r = await c.query<{ device_id: string; v: number }>(
-    `SELECT device_id, CASE WHEN $5::text = 'max' THEN max(value) ELSE avg(value) END AS v
+    `SELECT device_id, ${rule.agg === "max" ? "max(value)" : "avg(value)"} AS v
        FROM metric_samples
-      WHERE org_id = $1 AND device_id = ANY($2::uuid[]) AND ts > $3 AND ts <= $4 AND value IS NOT NULL
-        AND (metric = $6 OR ($7::text IS NOT NULL AND metric LIKE $7 ESCAPE '\\'))
+      WHERE org_id = $1 AND device_id = ANY($2::uuid[]) AND ts > $3 AND ts <= $4 AND value IS NOT NULL AND abs(value) < 1e15
+        AND (metric = $5 OR ($6::text IS NOT NULL AND metric LIKE $6 ESCAPE '\\'))
       GROUP BY device_id`,
-    [rule.org_id, ids, from, now, rule.agg, rule.metric, like]);
+    [rule.org_id, ids, from, now, rule.metric, like]);
   return new Map(r.rows.map((x) => [x.device_id, Number(x.v)]));
 }
 

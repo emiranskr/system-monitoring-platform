@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBlockedIp, resolveSafe, SsrfError } from "../src/alerts/net-guard.js";
+import { DnsResolveError, isBlockedIp, resolveSafe, SsrfError } from "../src/alerts/net-guard.js";
 
 describe("SSRF: engellenen IP araliklari", () => {
   it.each([
@@ -50,8 +50,10 @@ describe("resolveSafe: cozumleme + dogrulama TEK adimda", () => {
 
   it("localhost ve cozumlenemeyen ad reddedilir", async () => {
     await expect(resolveSafe("localhost", { allowPrivate: false, lookup: lookupTo("127.0.0.1") })).rejects.toBeInstanceOf(SsrfError);
-    await expect(resolveSafe("yok.example.com", { allowPrivate: false, lookup: async () => { throw Object.assign(new Error("ENOTFOUND"), { code: "ENOTFOUND" }); } })).rejects.toBeInstanceOf(SsrfError);
-    await expect(resolveSafe("bos.example.com", { allowPrivate: false, lookup: async () => [] })).rejects.toBeInstanceOf(SsrfError);
+    await expect(resolveSafe("yok.example.com", { allowPrivate: false, lookup: async () => { throw Object.assign(new Error("EAI_AGAIN"), { code: "EAI_AGAIN" }); } })).rejects.toBeInstanceOf(DnsResolveError);
+    await expect(resolveSafe("bos.example.com", { allowPrivate: false, lookup: async () => [] })).rejects.toBeInstanceOf(DnsResolveError);
+    // I-3: cozumleme hatasi engelli adres DEGILDIR (SsrfError degil) -> bildirim yeniden denenebilir
+    await expect(resolveSafe("yok.example.com", { allowPrivate: false, lookup: async () => { throw new Error("x"); } })).rejects.not.toBeInstanceOf(SsrfError);
   });
 
   it("allowPrivate (YALNIZ gelistirme/test bayragi) ozel adrese izin verir", async () => {

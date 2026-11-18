@@ -81,6 +81,21 @@ describe("degerlendirici: metrik kurali", () => {
     expect((await notifs(r)).map((x) => x.kind).sort()).toEqual(["firing", "resolved"]);
   });
 
+  it("I-2: tasan/zehirli bir kural digerlerini ve diger organizasyonlari DURDURMAZ; hatali kural atlanir", async () => {
+    const dA = await device(k.org, "pc1");
+    const dB = await device(orgB, "pcB");
+    const bad = await rule(k.org, { name: "zehirli", metric: "cpu.total", window_seconds: 60, for_seconds: 0, threshold: 90 });
+    const good = await rule(orgB, { name: "saglam", metric: "mem.used_pct", window_seconds: 60, for_seconds: 0, threshold: 50 });
+    await sample(k.org, dA, "cpu.total", 1e308, -5);
+    await sample(k.org, dA, "cpu.total", 1e308, -4);
+    await sample(orgB, dB, "mem.used_pct", 80, -5);
+    const errors: string[] = [];
+    const r = await evaluateAlerts(k.db.pool, at(0), { ...ctx(), onRuleError: (id: string) => errors.push(id) });
+    expect(r.ran).toBe(true);
+    expect(await incidents(good)).toHaveLength(1);
+    expect(await incidents(bad)).toHaveLength(0);
+  });
+
   it("ayni anda iki kez degerlendirmek MUKERRER olay/bildirim uretmez", async () => {
     const d = await device(k.org, "pc1");
     const ch = await channel(k.org);

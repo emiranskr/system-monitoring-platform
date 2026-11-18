@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
-import { resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
+import { DnsResolveError, resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
 import type { SendResult } from "./webhook.js";
 
 export interface EmailConfig {
@@ -50,7 +50,7 @@ export async function sendEmail(cfg: EmailConfig, payload: unknown, opts: EmailO
 
   let addr;
   try { addr = await resolveSafe(cfg.host, { allowPrivate: opts.allowPrivate, lookup: opts.lookup }); }
-  catch (e) { return fail(!(e instanceof SsrfError), e instanceof SsrfError ? e.message : "SMTP hedefi cozumlenemedi"); }
+  catch (e) { return fail(!(e instanceof SsrfError), e instanceof SsrfError || e instanceof DnsResolveError ? e.message : "SMTP hedefi cozumlenemedi"); }
 
   const p = (payload ?? {}) as Payload;
   const sev = SEV[p.severity ?? ""] ?? "UYARI";
