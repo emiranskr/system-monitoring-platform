@@ -50,6 +50,8 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       env: {
         ...process.env, DATABASE_URL: db.url, CREDENTIAL_KEY: randomBytes(32).toString("base64"), PORT: String(API_PORT), HOST: "127.0.0.1",
         ALLOWED_ORIGINS: WEB_ORIGIN, LOG_LEVEL: "warn", SAMPLE_INTERVAL_SECONDS: "5",
+        // M5: uyarilar. YALNIZ test: yerel http webhook alicisina izin + kisa degerlendirme/kuyruk araliklari.
+        CHANNEL_KEY: randomBytes(32).toString("base64"), ALERT_ALLOW_PRIVATE_TARGETS: "1", ALERT_ALLOW_INSECURE_WEBHOOK: "1", ALERT_EVALUATE_MS: "1000", ALERT_NOTIFY_MS: "1000",
       },
       stdio: ["ignore", "inherit", "pipe"],
     });

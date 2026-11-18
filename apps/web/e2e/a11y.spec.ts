@@ -113,3 +113,42 @@ test.describe("erisilebilirlik (axe): oturumlu ekranlar", () => {
     await expect(page).toHaveURL(/#icerik$/);
   });
 });
+
+test.describe("erisilebilirlik (axe): uyarilar", () => {
+  test.use({ storageState: authFile("owner") });
+
+  for (const tab of ["Aktif", "Geçmiş", "Kurallar", "Kanallar"]) {
+    test(`uyarilar: ${tab} sekmesi`, async ({ page }) => {
+      await open(page, "/uyarilar", "Uyarılar");
+      await page.getByRole("tab", { name: tab }).click();
+      await expect(page.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
+      await expect(page.getByRole("main")).toBeVisible();
+      await page.waitForTimeout(500);
+      await expectNoSeriousViolations(page, `uyarilar/${tab}`);
+    });
+  }
+
+  test("uyarilar: kural diyalogu (klavye: odak diyalogda, Esc kapatir ve odak tetikleyiciye doner)", async ({ page }) => {
+    await open(page, "/uyarilar", "Uyarılar");
+    await page.getByRole("tab", { name: "Kurallar" }).click();
+    const trigger = page.getByRole("button", { name: /kural ekle/i });
+    await trigger.click();
+    const dlg = page.getByRole("dialog", { name: "Uyarı kuralı ekle" });
+    await expect(dlg).toBeVisible();
+    expect(await page.evaluate(() => !!document.activeElement?.closest("[role=dialog]"))).toBe(true);
+    await expectNoSeriousViolations(page, "uyarilar/kural diyalogu");
+    await page.keyboard.press("Escape");
+    await expect(dlg).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
+  test("uyarilar: kanal diyalogu (webhook ve e-posta)", async ({ page }) => {
+    await open(page, "/uyarilar", "Uyarılar");
+    await page.getByRole("tab", { name: "Kanallar" }).click();
+    await page.getByRole("button", { name: /kanal ekle/i }).click();
+    await expect(page.getByRole("dialog", { name: "Bildirim kanalı ekle" })).toBeVisible();
+    await expectNoSeriousViolations(page, "uyarilar/kanal diyalogu (webhook)");
+    await page.getByLabel("Tür").selectOption("email");
+    await expectNoSeriousViolations(page, "uyarilar/kanal diyalogu (e-posta)");
+  });
+});

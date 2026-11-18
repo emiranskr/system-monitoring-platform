@@ -43,7 +43,7 @@ test("yatay tasma yok: giris (oturumsuz) ve cok uzun cihaz adi", async ({ page, 
 
 test("etkilesimli ogeler: yukseklik >= 44 px (dokunma), genislik >= 24 px (WCAG 2.2 AA)", async ({ page }) => {
   const mobile = (page.viewportSize()?.width ?? 1280) < 600;
-  for (const path of ["/", "/cihazlar", `/cihaz/${state().devices.online.id}`]) {
+  for (const path of ["/", "/cihazlar", "/uyarilar", `/cihaz/${state().devices.online.id}`]) {
     await open(page, path);
     await expect(page.locator("main")).toBeVisible();
     const small = await page.evaluate(() => {
@@ -78,4 +78,22 @@ test("gezinme erisilebilir: ust cubuk sarar, cikis butonu her gorunumde gorunur"
   await expect(page.getByRole("navigation", { name: "Ana gezinme" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Çıkış" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Cihazlar" })).toBeVisible();
+});
+
+test("yatay tasma yok: uyarilar (tum sekmeler) ve kural/kanal diyaloglari", async ({ page }) => {
+  await open(page, "/uyarilar", "Uyarılar");
+  for (const tab of ["Aktif", "Geçmiş", "Kurallar", "Kanallar"]) {
+    await page.getByRole("tab", { name: tab }).click();
+    await noOverflow(page, `uyarilar/${tab}`);
+  }
+  await page.getByRole("tab", { name: "Kurallar" }).click();
+  await page.getByRole("button", { name: /kural ekle/i }).click();
+  await expect(page.getByRole("dialog", { name: "Uyarı kuralı ekle" })).toBeVisible();
+  await noOverflow(page, "uyarilar/kural diyalogu");
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "Kanallar" }).click();
+  await page.getByRole("button", { name: /kanal ekle/i }).click();
+  await expect(page.getByRole("dialog", { name: "Bildirim kanalı ekle" })).toBeVisible();
+  await page.getByLabel("Tür").selectOption("email");
+  await noOverflow(page, "uyarilar/kanal diyalogu (e-posta)");
 });
