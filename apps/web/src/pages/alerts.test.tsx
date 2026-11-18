@@ -147,6 +147,26 @@ describe("Uyarilar sayfasi", () => {
     await waitFor(() => expect(m.calls.some((c) => c.method === "DELETE")).toBe(true));
   });
 
+  it("I-4: yerlesik kurala da kanal baglanabilir (Kanallari duzenle -> PATCH yalniz channel_ids)", async () => {
+    const m = renderAlerts({ rules: [rule({ builtin: "offline", name: "Cihaz cevrimdisi" })], channels: [channel()], extra: {
+      [`PATCH /api/v1/alert-rules/${R1}`]: () => ({ status: 200, body: rule({ channel_ids: [C1] }) }),
+    } });
+    const user = userEvent.setup();
+    await tab("Kurallar");
+    await user.click(await screen.findByRole("button", { name: /kanalları düzenle/i }));
+    await user.click(screen.getByRole("checkbox", { name: "slack" }));
+    await user.click(screen.getByRole("button", { name: /kanalları kaydet/i }));
+    await waitFor(() => expect(m.calls.find((c) => c.method === "PATCH")).toBeTruthy());
+    expect(m.calls.find((c) => c.method === "PATCH")!.body).toEqual({ channel_ids: [C1] });
+  });
+
+  it("I-4: viewer 'Kanallari duzenle' goremez", async () => {
+    renderAlerts({ role: "viewer", channels: [channel()] });
+    await tab("Kurallar");
+    await screen.findByRole("list", { name: "Uyarı kuralları" });
+    expect(screen.queryByRole("button", { name: /kanalları düzenle/i })).toBeNull();
+  });
+
   it("webhook kanali: SIR alani password; gonderim sonrasi alanlar sifirlanir ve yanit/sayfada SIR YOK", async () => {
     const m = renderAlerts({ extra: { "POST /api/v1/notification-channels": () => ({ status: 201, body: channel({ name: "yeni" }) }) } });
     const user = userEvent.setup();

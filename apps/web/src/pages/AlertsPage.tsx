@@ -25,6 +25,7 @@ function RulesPanel({ canWrite, channels }: { canWrite: boolean; channels: Notif
   const q = useAlertRules();
   const m = useAlertMutations();
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; ids: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function run(p: Promise<unknown>) {
@@ -51,6 +52,7 @@ function RulesPanel({ canWrite, channels }: { canWrite: boolean; channels: Notif
                 </div>
                 {canWrite ? (
                   <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="ghost" onClick={() => setEditing({ id: r.id, ids: [...r.channel_ids] })}>Kanalları düzenle<span className="sr-only"> — {r.name}</span></Button>
                     <Button type="button" variant="ghost" onClick={() => void run(m.patchRule.mutateAsync({ id: r.id, patch: { enabled: !r.enabled } }))}>
                       {r.enabled ? "Devre dışı bırak" : "Etkinleştir"}<span className="sr-only"> — {r.name}</span>
                     </Button>
@@ -63,6 +65,22 @@ function RulesPanel({ canWrite, channels }: { canWrite: boolean; channels: Notif
                       ) : <Button type="button" variant="ghost" onClick={() => setConfirm(r.id)}>Sil<span className="sr-only"> — {r.name}</span></Button>
                     ) : null}
                   </div>
+                ) : null}
+                {canWrite && editing?.id === r.id ? (
+                  <fieldset className="basis-full space-y-2 border-t border-border pt-2">
+                    <legend className="text-sm font-medium">Bildirim kanalları — {r.name}</legend>
+                    {channels.length === 0 ? <p className="text-sm text-text-secondary">Önce Kanallar sekmesinden bir kanal ekleyin.</p> : channels.map((c) => (
+                      <label key={c.id} className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={editing.ids.includes(c.id)}
+                          onChange={(e) => setEditing({ id: r.id, ids: e.target.checked ? [...editing.ids, c.id] : editing.ids.filter((x) => x !== c.id) })} />
+                        {c.name}
+                      </label>
+                    ))}
+                    <div className="flex gap-2">
+                      <Button type="button" onClick={() => { const ids = editing.ids; setEditing(null); void run(m.patchRule.mutateAsync({ id: r.id, patch: { channel_ids: ids } })); }}>Kanalları kaydet</Button>
+                      <Button type="button" variant="ghost" onClick={() => setEditing(null)}>Vazgeç</Button>
+                    </div>
+                  </fieldset>
                 ) : null}
               </li>
             ))}
