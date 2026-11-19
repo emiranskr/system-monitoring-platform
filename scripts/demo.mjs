@@ -77,7 +77,7 @@ async function main() {
     // --- cihazlar ---
     const now = Date.now();
     const info = (hostname, gpu) => JSON.stringify({ hostname, os: "Windows 11 Pro", agent_version: "0.1.0",
-      gpus: gpu ? [{ id: GPU, name: "NVIDIA RTX 4070", vendor: "NVIDIA" }] : [],
+      gpus: gpu ? [{ canonical_id: GPU, name: "NVIDIA RTX 4070" }] : [],
       adapters: [{ id: "eth0", name: "Ethernet" }], volumes: [{ id: "c", name: "C:" }] });
     const devs = [];
     for (const [i, d] of DEVICES.entries()) {
@@ -88,12 +88,12 @@ async function main() {
       devs.push({ ...d, id, token, i });
     }
 
-    // --- gecmis veri: son 3 sa 15 sn'de bir (ham) + onceki 24 sa 1 dk'da bir; cevrimdisi cihaz kesildigi ana kadar ---
+    // --- gecmis veri: son 3 sa 5 sn aralikli (ham) + onceki 24 sa 1 dk'da bir; cevrimdisi cihaz kesildigi ana kadar ---
     let rows = 0;
     for (const d of devs.filter((x) => !x.never)) {
       const end = now - (d.offlineMs ?? 5000);
       const batch = [];
-      for (let t = end - 27 * 3600_000; t <= end; t += t > end - 3 * 3600_000 ? 15_000 : 60_000) {
+      for (let t = end - 27 * 3600_000; t <= end; t += t > end - 3 * 3600_000 ? 5_000 : 60_000) {
         for (const [metric, value] of Object.entries(sample(d, t, d.i))) batch.push([new Date(t), org, d.id, metric, value]);
       }
       for (let k = 0; k < batch.length; k += 4000) {

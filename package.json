@@ -7,9 +7,9 @@
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
-    "test": "pnpm -r --if-present test && node --test scripts/",
+    "test": "pnpm -r --if-present test && node --test \"scripts/*.test.mjs\"",
     "lint": "pnpm -r --if-present lint",
-    "test:security": "pnpm --filter @sysmon/api test:security && pnpm --filter @sysmon/db test && node --test scripts/",
+    "test:security": "pnpm --filter @sysmon/api test:security && pnpm --filter @sysmon/db test && node --test \"scripts/*.test.mjs\"",
     "drill:backup": "node scripts/backup-restore-drill.mjs",
     "demo": "node scripts/demo.mjs",
     "demo:live": "node scripts/demo.mjs --live",

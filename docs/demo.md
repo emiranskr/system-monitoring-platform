@@ -16,7 +16,7 @@ Giriş: `http://localhost:5173/giris`, e-posta `demo@example.com`. **Parola her 
 
 ## Ne basılır
 - **5 cihaz:** `ofis-pc-01` (normal), `tasarim-ws-gpu` (GPU: kullanım, VRAM, sıcaklık), `sunucu-01` (yüksek CPU + disk %92), `laptop-ahmet` (3 saattir çevrimdışı), `yeni-cihaz` (hiç veri göndermemiş).
-- **27 saatlik geçmiş:** son 3 saat 15 sn aralıklı, öncesi 1 dk aralıklı (CPU, bellek, disk, ağ, GPU); deterministik dalgalanma.
+- **27 saatlik geçmiş:** son 3 saat 5 sn aralıklı (gerçek agent aralığı), öncesi 1 dk aralıklı (CPU, bellek, disk, ağ, GPU); deterministik dalgalanma.
 - **Uyarılar:** "Demo: yüksek CPU" kuralı, 1 çözülmüş geçmiş olay ve `sunucu-01` için açık kritik olay. API açıkken yerleşik kurallar da çalışır: `laptop-ahmet` için **"Cihaz çevrimdışı" olayı API başladıktan yaklaşık 6 dk sonra** (grace süresi) kendiliğinden oluşur.
 - Bildirim kanalı **basılmaz** (kanal sırları `CHANNEL_KEY` ile şifrelenir): Uyarılar → Kanallar'dan ekleyin.
 

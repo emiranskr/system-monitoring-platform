@@ -1,20 +1,46 @@
 name: ci
+
 on:
   push:
   pull_request:
+
+# En az yetki: yalnizca depo icerigini okur.
+permissions:
+  contents: read
+
+env:
+  # CI'ya OZGU, gecici (sir DEGIL) test veritabani degerleri; gercek anahtar/sir kullanilmaz.
+  DATABASE_URL: postgres://sysmon:ci-only-test-password@localhost:5432/sysmon
+
 jobs:
   node:
+    name: node (build, lint, test, guvenlik)
     runs-on: ubuntu-latest
+    services:
+      db:
+        image: timescale/timescaledb:2.17.2-pg16
+        env:
+          POSTGRES_USER: sysmon
+          POSTGRES_PASSWORD: ci-only-test-password
+          POSTGRES_DB: sysmon
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sysmon -d sysmon"
+          --health-interval 5s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build          # lint/E2E tipleri derlenmis paketlere (packages/*/dist) bagimlidir
       - run: pnpm lint
-      - run: pnpm build
-      - run: pnpm test
+      - run: pnpm test           # tum paketler (gercek TimescaleDB servisi) + betik testleri; Linux'ta argon2 yerel ikilisi de sinanir
+      - run: pnpm test:security
+      - run: pnpm license-scan
+
   agent:
+    name: agent (.NET Debug + Release)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,3 +48,35 @@ jobs:
         with: { global-json-file: global.json }
       - run: dotnet test agent/windows/SysMon.Agent.sln -c Debug
       - run: dotnet test agent/windows/SysMon.Agent.sln -c Release
+
+  e2e:
+    name: e2e (Playwright, gercek tarayici)
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: timescale/timescaledb:2.17.2-pg16
+        env:
+          POSTGRES_USER: sysmon
+          POSTGRES_PASSWORD: ci-only-test-password
+          POSTGRES_DB: sysmon
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sysmon -d sysmon"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Chrome kurulumu (Playwright channel "chrome")
+        run: pnpm --filter @sysmon/web exec playwright install --with-deps chrome
+      - run: pnpm --filter @sysmon/web e2e
+      - name: Playwright raporu (yalniz basarisizlikta)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7

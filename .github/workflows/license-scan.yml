@@ -1,7 +1,12 @@
 name: license-scan
+
 on:
   push:
   pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -11,5 +16,5 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: node --test scripts/
+      - run: node --test "scripts/*.test.mjs"
       - run: node scripts/license-scan.mjs
