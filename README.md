@@ -30,7 +30,7 @@
 - CPU, bellek, disk, ağ ve NVIDIA GPU (NVML) ölçümleri; düşük yetkili sanal hesapta (`NT SERVICE\…`) çalışır, `LocalSystem` kullanmaz.
 - Diske yazılan, sıkıştırılmış **spool**: ağ/sunucu kesintisinde veri kaybolmaz; sıra numaralı (`spool_epoch` + `seq`) tekrar gönderim güvenle yinelenebilir.
 - **Kayıt (`--enroll`)**: panelden üretilen tek kullanımlık belirteçle sunucuya kaydolur; cihaz bilgisini (ad, OS, **GPU/ağ/disk listesi**) gönderir, kimlik bilgisini DPAPI ile korumalı depoya yazar. **Kimlik bilgisi döndürme (`--rotate`)** ve sunucu tarafında çalınmış kimlik bilgisi tespiti vardır. Gerçek API'ye karşı uçtan uca denendi ([ayrıntı](docs/kurulum-agent.md#kayıt-enrollment-ve-kimlik-bilgisi-döndürme--komut-satırı)); periyodik otomatik döndürme yoktur.
-- Gerçek **NVIDIA GPU** (NVML: kullanım, VRAM, sıcaklık, güç, fan, saat hızları) geliştirme makinesinde (RTX 5070) gerçek ölçümle doğrulandı.
+- **NVIDIA GPU (NVML):** kullanım, VRAM ve sıcaklık geliştirme makinesinde (RTX 5070) `nvidia-smi` ile çapraz doğrulandı; güç/fan/saat hızı sürücü destekliyorsa okunur ancak gerçek donanımda çapraz doğrulanmadı.
 - Release derlemesi yalnızca HTTPS kabul eder (isteğe bağlı SPKI sertifika sabitleme).
 
 **API (Fastify 5 + TypeScript)**

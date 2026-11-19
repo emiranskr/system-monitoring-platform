@@ -41,15 +41,16 @@ Bu matris **tamamlanmadan** "kurulum paketi hazır" denmez. Gerçek LibreHardwar
 ## Kayıt (enrollment) ve kimlik bilgisi döndürme — komut satırı
 Agent, sunucuya **kendini kaydeden** ve kimlik bilgisini döndüren istemci komutlarına sahiptir (gerçek API'ye karşı uçtan uca doğrulandı: kayıt → cihaz panelde görünür, `device_info` GPU/ağ/disk listesiyle gelir → gerçek ölçümler akar → döndürme).
 
-1. **Panelden** (Cihazlar → *Cihaz ekle*, owner/admin) tek kullanımlık **kayıt belirteci** üretin; bir dosyaya yazın (belirteç komut satırında geçmez: süreç listesinde görünürdü).
+1. **Panelden** (Cihazlar → *Cihaz ekle*, owner/admin) tek kullanımlık **kayıt belirteci** üretin; bir dosyaya yazın (belirteç komut satırında geçmez: süreç listesinde görünürdü). Dosyayı **yalnız yöneticilerin okuyabildiği bir dizine** koyun; başarıda agent dosyayı üzerine yazıp siler.
 2. Agent'ı o makinede çalıştırın (token dosyasını okuyabilen hesapla):
 ```bash
-Agent.Service.exe --enroll C:\gecici\kayit.txt --server https://izleme.example.com [--server-pin sha256/<base64>] [--data-dir <dizin>]
+Agent.Service.exe --enroll C:\gecici\kayit.txt --server https://izleme.example.com --token-reader "NT SERVICE\SysMonAgent" [--server-pin sha256/<base64>] [--data-dir <dizin>]
 ```
    - Cihaz bilgisi (ad, OS, **GPU listesi (NVML)**, ağ kartları, diskler) gönderilir; dönen kimlik bilgisi **DPAPI ile korumalı depoya** yazılır; belirteç dosyası silinir.
-   - Çıkış kodları: `0` başarılı, `2` girdi hatası, `3` belirteç reddedildi/kullanılmış/süresi dolmuş, `4` hız sınırı, `5` geçici hata (**aynı komut yeniden çalıştırılabilir**: `enroll_id` veri dizininde saklanır, sunucu 10 dk içinde aynı kimlik bilgisini döndürür), `6` TLS/pin doğrulaması başarısız (belirteç **gönderilmedi**), `7` diğer.
+   - `--token-reader`: kimlik bilgisi dosyasını **servisin sanal hesabı** okuyabilsin diye ACL'e eklenir (kurulum betiğiyle aynı değer). Mevcut dosyada servis hesabı zaten varsa sonraki yazımlarda (kayıt/döndürme) **korunur**; yine de ilk kayıtta verin.
+   - Çıkış kodları: `0` başarılı, `1` beklenmeyen G/Ç veya şifreleme hatası, `2` girdi hatası, `3` belirteç reddedildi/kullanılmış/süresi dolmuş (**bayat `enroll_id` sıfırlanır**: yeni belirteçle yeniden deneyin), `4` hız sınırı, `5` geçici hata (**aynı komut yeniden çalıştırılabilir**: `enroll_id` veri dizininde saklanır, sunucu 10 dk içinde aynı kimlik bilgisini döndürür), `6` TLS/pin doğrulaması başarısız (belirteç **gönderilmedi**), `7` diğer.
 3. Servisi `--server` (ve varsa `--server-pin`) ile çalıştırın: yükleme başlar.
-4. **Kimlik bilgisi döndürme:** `Agent.Service.exe --rotate --server https://...` — mevcut kimlik bilgisiyle sunucudan yenisini alır ve depoya yazar; sunucu 24 saat eski+yeni kimlik bilgisini birlikte kabul eder, yeni kimlik bilgisi ilk kullanıldığında eskisi iptal olur (çalınmış kimlik bilgisi tespiti). **Otomatik/periyodik döndürme yoktur** (elle veya zamanlanmış görevle çalıştırılır).
+4. **Kimlik bilgisi döndürme:** `Agent.Service.exe --rotate --server https://... --token-reader "NT SERVICE\SysMonAgent"` — mevcut kimlik bilgisiyle sunucudan yenisini alır ve depoya yazar; sunucu 24 saat eski+yeni kimlik bilgisini birlikte kabul eder, yeni kimlik bilgisi ilk kullanıldığında eskisi iptal olur (çalınmış kimlik bilgisi tespiti). **Otomatik/periyodik döndürme yoktur** (elle veya zamanlanmış görevle çalıştırılır).
 
 ## İsteğe bağlı sensör yardımcısı (varsayılan KAPALI)
 `--sensor-helper <mutlak yol>` ile etkinleşir; yoksa yardımcı **hiçbir koşulda başlatılmaz**. Yol yoksa/exe değilse/yeniden-ayrışma noktasıysa/dizin yazılabilir veya sahibi güvenilmez ise **kapalı kalır** (istisna yok, uyarı loglanır, agent diğer ölçümlere devam eder). Yetki yükseltme, sürücü yükleme ve UAC yoktur. **Üretim yardımcısı yalnız `NullSensorProvider` kullanır (sensörler "kullanılamıyor")**: gerçek LibreHardwareMonitor/PawnIO entegrasyonu yapılmamıştır (kullanıcı onaylı ayrı kapı).
