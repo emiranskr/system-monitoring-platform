@@ -38,9 +38,17 @@ public sealed class PipelineTests : IDisposable
         await run;
 
         Assert.True(spool.PendingCount >= 2, $"en az 2 batch beklenir, gelen: {spool.PendingCount}");
-        var first = spool.PeekOldest()!;
-        Assert.True(first.Samples.Count >= 2);
-        Assert.All(first.Samples, s => Assert.True(s.M.ContainsKey("cpu.total")));
+        // Tek bir batch'in ornek sayisi zamanlamaya baglidir (yavas CI kosucusunda ilk batch'e 1 ornek dusebilir); degismez olan: TUM batch'lerde toplanan
+        // ornekler birden fazladir, her batch bos degildir ve her ornek beklenen metrigi tasir.
+        var samples = 0;
+        for (var b = spool.PeekOldest(); b is not null; b = spool.PeekOldest())
+        {
+            Assert.NotEmpty(b.Samples);
+            Assert.All(b.Samples, s => Assert.True(s.M.ContainsKey("cpu.total")));
+            samples += b.Samples.Count;
+            spool.Ack(b);
+        }
+        Assert.True(samples >= 2, $"toplam en az 2 ornek beklenir, gelen: {samples}");
     }
 
     [Fact]
