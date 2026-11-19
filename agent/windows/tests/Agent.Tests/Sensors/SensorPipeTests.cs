@@ -76,6 +76,35 @@ public class SensorPipeTests
         finally { await Stop(s); }
     }
 
+    [Fact]
+    public async Task Istemci_baglanip_sunucu_beklemeye_baslamadan_kopsa_sunucu_COKMEZ_ve_sonraki_istemciye_hizmet_verir()
+    {
+        // KOK NEDEN (CI'da yakalandi, aralikli "yetim kalmaz" testi): istemci sunucu WaitForConnection'a gelmeden baglanip kapanirsa
+        // ConnectNamedPipe ERROR_NO_DATA ("The pipe is being closed") doner; bu IOException RunAsync'ten kontrolsuz cikip yardimci sureci oldurdu.
+        var name = Name();
+        var server = new SensorPipeServer(name, new FakeSensorProvider(), Me, null, TimeSpan.FromSeconds(2));
+        server.Start();
+        using (var early = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous))
+        {
+            await early.ConnectAsync(3000);
+        }   // hemen kapat: sunucu henuz kabul etmedi
+        var cts = new CancellationTokenSource();
+        var run = server.RunAsync(cts.Token);
+        try
+        {
+            await using var c = await SensorPipeClient.ConnectAsync(name, ThisProcess, TimeSpan.FromSeconds(5), CancellationToken.None);
+            var r = await c.ReadAllAsync(TimeSpan.FromSeconds(2), CancellationToken.None);
+            Assert.Equal(2, r.Count);
+            Assert.False(run.IsFaulted, "sunucu dongusu cokmemeli");
+        }
+        finally
+        {
+            cts.Cancel();
+            try { await run.WaitAsync(TimeSpan.FromSeconds(5)); } catch (OperationCanceledException) { }
+            await server.DisposeAsync();
+        }
+    }
+
     // ---------- ACL ----------
 
     [Fact]

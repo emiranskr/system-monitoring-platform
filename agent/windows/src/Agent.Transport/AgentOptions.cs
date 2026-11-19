@@ -9,13 +9,16 @@ public sealed record AgentOptions(
     string? DataDir = null,
     string? ImportToken = null,
     IReadOnlyList<string>? ServerPins = null,
-    string? TokenReader = null)
+    string? TokenReader = null,
+    string? EnrollTokenFile = null,
+    bool Rotate = false)
 {
     public static AgentOptions Parse(string[] args)
     {
         var service = false;
         var insecure = false;
-        string? server = null, tokenFile = null, dataDir = null, importToken = null, tokenReader = null;
+        var rotate = false;
+        string? server = null, tokenFile = null, dataDir = null, importToken = null, tokenReader = null, enroll = null;
         var pins = new List<string>();
         for (var i = 0; i < args.Length; i++)
         {
@@ -36,6 +39,12 @@ public sealed record AgentOptions(
                 case "--import-token":
                     importToken = Value(args, ref i);
                     break;
+                case "--rotate":
+                    rotate = true;
+                    break;
+                case "--enroll":
+                    enroll = Value(args, ref i);   // kayit belirecinin bulundugu DOSYA (komut satirinda belirec gecmez: surec listesinde gorunurdu)
+                    break;
                 case "--token-reader":
                     tokenReader = Value(args, ref i);
                     break;
@@ -54,7 +63,11 @@ public sealed record AgentOptions(
                     throw new ArgumentException($"Bilinmeyen secenek: {args[i]}");
             }
         }
-        return new AgentOptions(service, insecure, server, tokenFile, dataDir, importToken, pins.Count == 0 ? null : pins, tokenReader);
+        if (enroll is not null && server is null) throw new ArgumentException("--enroll icin --server gerekli.");
+        if (enroll is not null && importToken is not null) throw new ArgumentException("--enroll ile --import-token birlikte kullanilamaz.");
+        if (rotate && server is null) throw new ArgumentException("--rotate icin --server gerekli.");
+        if (rotate && (enroll is not null || importToken is not null)) throw new ArgumentException("--rotate, --enroll/--import-token ile birlikte kullanilamaz.");
+        return new AgentOptions(service, insecure, server, tokenFile, dataDir, importToken, pins.Count == 0 ? null : pins, tokenReader, enroll, rotate);
     }
 
     private static string Value(string[] args, ref int i)

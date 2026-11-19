@@ -36,6 +36,44 @@ if (options.ImportToken is not null)
     }
 }
 
+// Kayit: tek kullanimlik belirec -> cihaz kimlik bilgisi (korumali depoya yazilir). Ayrintilar: EnrollCommand.
+if (options.EnrollTokenFile is not null)
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        Console.Error.WriteLine("--enroll yalnizca Windows'ta desteklenir.");
+        return 2;
+    }
+    try
+    {
+        return await EnrollCommand.RunAsync(options, Console.Out, Console.Error);
+    }
+    catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException or UnauthorizedAccessException or CryptographicException)
+    {
+        Console.Error.WriteLine($"Kayit tamamlanamadi: {ex.Message}");
+        return 1;
+    }
+}
+
+// Kimlik bilgisi dondurme (kayitli cihaz): RotateCommand.
+if (options.Rotate)
+{
+    if (!OperatingSystem.IsWindows())
+    {
+        Console.Error.WriteLine("--rotate yalnizca Windows'ta desteklenir.");
+        return 2;
+    }
+    try
+    {
+        return await RotateCommand.RunAsync(options, Console.Out, Console.Error);
+    }
+    catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException or UnauthorizedAccessException or CryptographicException)
+    {
+        Console.Error.WriteLine($"Dondurma tamamlanamadi: {ex.Message}");
+        return 1;
+    }
+}
+
 // Hizli basarisizlik: izin verilmeyen sunucu adresi (ornegin Release'te http) ana bilgisayar kurulmadan reddedilir. Aksi halde
 // istisna Worker icinde kaybolur ve surec "basarili" (0) diye durur: yanlis yapilandirma SCM/operator icin gorunmez olurdu.
 if (options.Server is { } server && (!Uri.TryCreate(server, UriKind.Absolute, out var serverUri) || !ServerUrlPolicy.IsAllowed(serverUri, options)))

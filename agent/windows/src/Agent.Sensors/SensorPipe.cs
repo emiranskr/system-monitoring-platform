@@ -82,12 +82,17 @@ public sealed class SensorPipeServer : IAsyncDisposable
     public void Start()
     {
         if (_stream is not null) throw new InvalidOperationException("zaten basladi");
+        _stream = CreateStream();
+    }
+
+    private NamedPipeServerStream CreateStream()
+    {
         var sec = new PipeSecurity();
         sec.AddAccessRule(new PipeAccessRule(_allowed, PipeAccessRights.ReadWrite | PipeAccessRights.Synchronize, AccessControlType.Allow));
         sec.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null), PipeAccessRights.FullControl, AccessControlType.Allow));
         try
         {
-            _stream = NamedPipeServerStreamAcl.Create(_name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte,
+            return NamedPipeServerStreamAcl.Create(_name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte,
                 PipeOptions.Asynchronous | PipeOptions.FirstPipeInstance, 4096, 4096, sec);
         }
         catch (UnauthorizedAccessException e) { throw new SensorPipeException(SensorPipeError.NameInUse, e); }
@@ -110,7 +115,18 @@ public sealed class SensorPipeServer : IAsyncDisposable
         var stream = _stream ?? throw new InvalidOperationException("once Start()");
         while (!ct.IsCancellationRequested)
         {
-            await stream.WaitForConnectionAsync(ct).ConfigureAwait(false);
+            try { await stream.WaitForConnectionAsync(ct).ConfigureAwait(false); }
+            catch (IOException)
+            {
+                // Istemci baglanip biz kabul etmeden kapandi (ERROR_NO_DATA, "The pipe is being closed"): bu bir istemci davranisidir, sunucu hatasi DEGIL.
+                // Dongu surer, siradaki istemci kabul edilir. (Daha once kontrolsuz cikip yardimci sureci oldurup aralikli test hatasina yol aciyordu.)
+                // Bu durumda ornek "kapaniyor" halinde takili kalir ve .NET Disconnect() bunu temizlemez: ornek YENIDEN olusturulur.
+                // FirstPipeInstance burada da gecerlidir: bu arada ad baska bir surec tarafindan kapilmissa olusturma NameInUse ile BASARISIZ olur (guvenli taraf).
+                try { stream.Dispose(); } catch (Exception) { }
+                stream = _stream = CreateStream();
+                await Task.Delay(10, ct).ConfigureAwait(false);   // kalici bir hata durumunda cekirdegi mesgul etmesin
+                continue;
+            }
             try { await ServeAsync(stream, ct).ConfigureAwait(false); }
             catch (SensorProtocolException) { /* bozuk/kesik istek veya istemci kapandi: baglantiyi birak */ }
             catch (IOException) { }

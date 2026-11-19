@@ -264,6 +264,12 @@ importers:
       '@playwright/test':
         specifier: ^1.65.1
         version: 1.65.1
+      '@sysmon/api':
+        specifier: workspace:*
+        version: link:../api
+      '@sysmon/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@tailwindcss/vite':
         specifier: ^4.3.5
         version: 4.3.5(vite@8.3.8(@types/node@22.20.5)(jiti@2.7.0))
