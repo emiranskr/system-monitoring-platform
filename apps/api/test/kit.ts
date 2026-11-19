@@ -21,6 +21,9 @@ export const ORIGIN = "https://panel.example.test";
 
 export async function setupKit(opts: { spkiPins?: string[]; sampleIntervalSeconds?: number; trustProxy?: boolean | string[]; limits?: AppOptions["limits"]; auth?: AppOptions["auth"]; stream?: AppOptions["stream"]; channelKey?: Buffer | null; alerts?: AppOptions["alerts"] } = {}): Promise<Kit> {
   const db = await createTestDb();
+  // Testler SABIT gecmis bir saat (2026-11-12) kullanir; TimescaleDB'nin arka plan saklama/sikistirma isleri duvar saatine gore calisir ve bu "eski"
+  // veriyi test ortasinda silebilir (CI'da aralikli "ratelimit ... satir sayisi 0" hatasinin nedeni). Politikalar sema testlerinde (packages/db) dogrulanir.
+  await db.pool.query("SELECT alter_job(job_id, scheduled => false) FROM timescaledb_information.jobs WHERE proc_name IN ('policy_retention', 'policy_compression')");
   const clock = { now: new Date("2026-11-12T12:00:00Z") };
   const app = buildApp({ pool: db.pool, now: () => clock.now, credentialKey: KEY, spkiPins: opts.spkiPins, sampleIntervalSeconds: opts.sampleIntervalSeconds, trustProxy: opts.trustProxy,
     auth: opts.auth ?? { allowedOrigins: [ORIGIN] }, stream: opts.stream,
