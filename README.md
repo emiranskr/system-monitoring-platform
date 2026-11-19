@@ -29,7 +29,8 @@
 **Agent (Windows servisi, .NET 10)**
 - CPU, bellek, disk, ağ ve NVIDIA GPU (NVML) ölçümleri; düşük yetkili sanal hesapta (`NT SERVICE\…`) çalışır, `LocalSystem` kullanmaz.
 - Diske yazılan, sıkıştırılmış **spool**: ağ/sunucu kesintisinde veri kaybolmaz; sıra numaralı (`spool_epoch` + `seq`) tekrar gönderim güvenle yinelenebilir.
-- Tek kullanımlık kayıt (enrollment) belirteci, **kimlik bilgisi döndürme** (rotation) ve çalınmış belirteç tespiti.
+- **Kayıt (`--enroll`)**: panelden üretilen tek kullanımlık belirteçle sunucuya kaydolur; cihaz bilgisini (ad, OS, **GPU/ağ/disk listesi**) gönderir, kimlik bilgisini DPAPI ile korumalı depoya yazar. **Kimlik bilgisi döndürme (`--rotate`)** ve sunucu tarafında çalınmış kimlik bilgisi tespiti vardır. Gerçek API'ye karşı uçtan uca denendi ([ayrıntı](docs/kurulum-agent.md#kayıt-enrollment-ve-kimlik-bilgisi-döndürme--komut-satırı)); periyodik otomatik döndürme yoktur.
+- Gerçek **NVIDIA GPU** (NVML: kullanım, VRAM, sıcaklık, güç, fan, saat hızları) geliştirme makinesinde (RTX 5070) gerçek ölçümle doğrulandı.
 - Release derlemesi yalnızca HTTPS kabul eder (isteğe bağlı SPKI sertifika sabitleme).
 
 **API (Fastify 5 + TypeScript)**
@@ -141,7 +142,7 @@ Bu depo **yerel geliştirme ve gösterim için tamamdır**; aşağıdakiler **he
 
 - **Kurulum paketi (Inno Setup):** betik yazıldı ve statik olarak sınandı, ancak **derlenmedi / gerçek Windows'ta kur-yükselt-kaldır testi yapılmadı**; Defender/SmartScreen davranışı ölçülmedi (yönetici yetkisi gerektirir). Bkz. [`docs/kurulum-agent.md`](docs/kurulum-agent.md).
 - **Windows servis doğrulaması** ve resmî 30 dakikalık dayanıklılık koşusu bu depodaki otomasyonla yapılmaz.
-- **Sıcaklık/ek sensörler:** LibreHardwareMonitor/PawnIO entegrasyonu **gerçek donanımda yapılmadı** (sensör yardımcısı protokolü ve süreç yönetimi sahte yardımcıyla test edildi; servise varsayılan olarak **kapalı** bağlanır).
+- **CPU/anakart sıcaklığı ve ek sensörler:** LibreHardwareMonitor/PawnIO entegrasyonu **yapılmadı**. Sensör yardımcı süreci (korumalı pipe, Job Object, watchdog) ve servise bağlama (`--sensor-helper`, **varsayılan kapalı**, güvenli-kapalı) hazırdır, ancak üretim yardımcısı yalnız `NullSensorProvider` kullanır ("kullanılamıyor"). NVIDIA GPU sıcaklığı bundan bağımsız olarak NVML ile çalışır.
 - **E-posta (SMTP)** yalnızca sahte SMTP sunucusuyla sınandı; gerçek sunucu denenmedi.
 - **Üretim dağıtımı** (TLS/nginx, gerçek alan adı) örnek yapılandırma olarak sunulur; gerçek ortamda denenmedi.
 - Tek API örneği desteklenir (zamanlanmış işler süreç içi); `CHANNEL_KEY`/`CREDENTIAL_KEY` döndürme yoktur ([`docs/yedekleme.md`](docs/yedekleme.md)).
