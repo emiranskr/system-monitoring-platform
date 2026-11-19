@@ -8,7 +8,7 @@
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933)
 ![TimescaleDB](https://img.shields.io/badge/TimescaleDB-2.17-fdb515)
 
-> **English summary.** A self-hosted, open-source monitoring platform for Windows machines: a low-privilege .NET Windows-service **agent** (CPU / RAM / disk / network / NVIDIA GPU) → **Fastify + TypeScript API** (multi-tenant, session auth with Argon2id, replay-safe ingest, credential rotation) → **PostgreSQL + TimescaleDB** (hypertables, continuous aggregates, compression) → **React dashboard** (live SSE charts, alert rules, webhook/SMTP notifications). Security-first design (SSRF guard, AES-256-GCM secrets with AAD, strict CSP, tenant isolation), 1 000+ automated tests including real-browser end-to-end runs. Documentation is in Turkish. See [Status and limitations](#durum-ve-bilinen-sınırlar) for what is *not* verified yet (installer, real hardware sensors, real SMTP).
+> **English summary.** A self-hosted, open-source monitoring platform for Windows machines: a low-privilege .NET Windows-service **agent** (CPU / RAM / disk / network / NVIDIA GPU) → **Fastify + TypeScript API** (multi-tenant, session auth with Argon2id, replay-safe ingest, credential rotation) → **PostgreSQL + TimescaleDB** (hypertables, continuous aggregates, compression) → **React dashboard** (live SSE charts, alert rules, webhook/SMTP notifications). Security-first design (SSRF guard, AES-256-GCM secrets with AAD, strict CSP, tenant isolation), 1 300+ automated tests including real-browser end-to-end runs. Documentation is in Turkish. See [Status and limitations](#durum-ve-bilinen-sınırlar) for what is *not* verified yet (installer, real hardware sensors, real SMTP).
 
 ---
 
@@ -119,7 +119,7 @@ Demo giriş e-postası `demo@example.com`; **parola her çalıştırmada rastgel
 
 ## Test ve kalite
 
-- **1 000+ otomatik test:** API (468), panel (217), protokol (73), veritabanı (27), betik (24), agent (.NET Debug 405 / Release 390) ve **gerçek tarayıcıyla uçtan uca (Playwright, 120 test)** — geçici bir TimescaleDB, derlenmiş API ve Chrome ile.
+- **1 300+ otomatik test:** API (470), panel (217), protokol (73), veritabanı (27), betik (24), agent (.NET Debug 445 / Release 428) ve **gerçek tarayıcıyla uçtan uca (Playwright, 120 test)** — geçici bir TimescaleDB, derlenmiş API ve Chrome ile.
 - `pnpm test:security`: tek komutla güvenlik kapısı (çapraz-organizasyon, replay, rotation, oturum, SSRF, sırlar, kuyruk).
 - Geliştirme sürecinde **bağımsız kod incelemeleri** (Critical 0 / Important 0 kabul ölçütü), mutasyon kontrolleri ve "önce kırmızı" test disiplini; ilerleme ve bulgular [`docs/ilerleme/`](docs/ilerleme/) altında.
 - Lisans taraması: `pnpm license-scan` (izinsiz lisans yok).
