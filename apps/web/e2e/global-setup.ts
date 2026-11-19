@@ -126,6 +126,9 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       const body = gzipSync(Buffer.from(JSON.stringify({ v: 1, spool_epoch: epoch, seq: seq++, sent_at: iso(t), samples: [{ ts: iso(t), m }] })));
       await fetch(`${API_ORIGIN}/agent/v1/ingest`, { method: "POST", headers: { "content-type": "application/json", "content-encoding": "gzip", authorization: `Bearer ${devices.online.token}` }, body }).catch(() => undefined);
     };
+    // Tohum (ham 5 sn katman) `now - 5 sn`de biter; yavas ortamlarda (CI) tohumlama/aggregate yenileme saniyelerce surer ve canli akis baslayana kadar
+    // "duzenli seride bosluk yok" testini bozan GERCEK bir bosluk kalir. Canli akis baslamadan hemen once aradaki bosluk ayni 5 sn adimiyla doldurulur.
+    await seed(devices.online.id, orgId, M, new Date(now), new Date(), 5);
     await tick();
     keepAlive = setInterval(() => void tick(), 4000);
 
