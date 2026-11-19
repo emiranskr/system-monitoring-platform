@@ -4,6 +4,7 @@
 - **Kurallar:** metrik (izin listesinden), toplama (ortalama/maksimum), pencere (15–3600 sn), operatör (`> >= < <=`), eşik, histerezis, süre (for, 0–86400 sn), önem (bilgi/uyarı/kritik), kapsam (tüm cihazlar veya cihaz listesi), kanallar.
 - **Durum makinesi:** OK → PENDING → FIRING → RESOLVED. Süre dolmadan bildirim yok; FIRING iken değer eşiğin histerezis bandında kalırsa çözülmez. Veri yoksa durum değişmez. Flapping (1 saat, eşik etrafında salınım) sıfır yinelenen bildirim üretir (testli).
 - **Yerleşik kurallar (her organizasyonda):** *Cihaz çevrimdışı* (60 sn eşik + 300 sn süre ≈ 6 dk grace), *Disk dolu* (herhangi bir disk > %90), *Sürekli yüksek CPU* (> %90, 5 dk), *Sürekli yüksek bellek* (> %90, 5 dk). Silinemez, devre dışı bırakılabilir/eşiği değiştirilebilir. Sıcaklık/GPU için yerleşik kural yoktur: kullanıcı tanımlı kural (`gpu.*.temp_c`, `sensor.*`).
+- **Pencere sınırı:** kural penceresi en az **2 × agent örnekleme aralığı** olmalıdır (varsayılan 5 sn → en az 15 sn şema sınırı; `SAMPLE_INTERVAL_SECONDS=30` ise en az 60 sn), aksi halde `400 window_too_small` (pencere bazı turlarda boş kalır ve süreli kural tetiklenemezdi). Çevrimdışı kuralı sunucu zamanından hesaplanır, muaftır.
 - **Kanallar:** webhook (POST JSON, isteğe bağlı zaman damgalı HMAC-SHA256 imzası (`X-Sysmon-Timestamp: <unix saniye>`, `X-Sysmon-Signature: sha256=<hex>`; imza `HMAC(sır, "<ts>.<gövde>")`), tekilleştirme başlığı `X-Sysmon-Dedupe`) ve e-posta (SMTP). Test bildirimi gönderilebilir.
 
 ## Çevrimdışı tespiti (N6)

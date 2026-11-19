@@ -7,6 +7,7 @@ import { badRequest, HttpError } from "../errors.js";
 import { jsonBody } from "../http-util.js";
 import { rateLimited, type Limiters } from "../ratelimit.js";
 import { requireRole } from "../session-guard.js";
+import { OFFLINE_METRIC } from "./model.js";
 import { ensureBuiltinRules } from "./evaluator.js";
 import { DnsResolveError, resolveSafe, SsrfError, type LookupAll } from "./net-guard.js";
 import { channelAad, encryptSecret, SecretsUnavailableError } from "./secrets.js";
@@ -19,6 +20,8 @@ export interface AlertRoutesOptions {
   /** YALNIZ gelistirme/test: http:// webhook. Uretimde false (HTTPS zorunlu). */
   allowInsecureWebhooks: boolean;
   lookup?: LookupAll;
+  /** Agent ornekleme araligi (sn): kural penceresi en az 2 aralik olmali (varsayilan 5). */
+  sampleIntervalSeconds?: number;
 }
 
 const MAX_RULES = 200;
@@ -53,6 +56,10 @@ async function checkRefs(pool: pg.Pool, orgId: string, scope: string[] | null, c
 
 export function registerAlertRoutes(app: FastifyInstance, pool: pg.Pool, now: () => Date, limiters: Limiters, o: AlertRoutesOptions): void {
   const admin = { preHandler: requireRole("admin", "owner") };
+  /** Pencere < 2 ornekleme araligi ise pencere bazi turlarda BOS kalir (veri yok) ve "sure" isteyen kural hic tetiklenemez. Cevrimdisi kurali sunucu zamanindan hesaplanir: muaf. */
+  const checkWindow = (metric: string, windowSeconds: number): void => {
+    if (metric !== OFFLINE_METRIC && windowSeconds < 2 * (o.sampleIntervalSeconds ?? 5)) throw new HttpError(400, "window_too_small");
+  };
 
   // ---------- kurallar ----------
   app.get("/api/v1/alert-rules", async (req) => {
@@ -67,6 +74,7 @@ export function registerAlertRoutes(app: FastifyInstance, pool: pg.Pool, now: ()
     const p = AlertRuleInputSchema.safeParse(jsonBody(req));
     if (!p.success) throw badRequest();
     const b = p.data;
+    checkWindow(b.metric, b.window_seconds);
     const count = (await pool.query<{ c: number }>("SELECT count(*)::int AS c FROM alert_rules WHERE org_id = $1 AND deleted_at IS NULL", [org])).rows[0]!.c;
     if (count >= MAX_RULES) throw new HttpError(409, "too_many_rules");
     await checkRefs(pool, org, b.scope_device_ids, b.channel_ids);
@@ -95,6 +103,7 @@ export function registerAlertRoutes(app: FastifyInstance, pool: pg.Pool, now: ()
     });
     if (!full.success) throw badRequest();
     const b: AlertRuleInput = full.data;
+    if (p.data.window_seconds !== undefined || p.data.metric !== undefined) checkWindow(b.metric, b.window_seconds);
     // Yalniz BU istekte degisen/verilen basvurular dogrulanir (silinmis eski kanal, ilgisiz bir PATCH'i engellemez).
     await checkRefs(pool, org, p.data.scope_device_ids === undefined ? null : b.scope_device_ids, p.data.channel_ids === undefined ? [] : b.channel_ids);
     const r = await pool.query<RuleRow>(

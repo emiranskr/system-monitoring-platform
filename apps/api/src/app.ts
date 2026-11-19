@@ -121,7 +121,7 @@ export function buildApp(opts: AppOptions): FastifyInstance {
   app.addHook("onResponse", async (req, reply) => {
     if (req.url.startsWith("/agent/v1/ingest") && reply.statusCode >= 500) health.recordFailure(now());
   });
-  registerAlertRoutes(app, opts.pool, now, limiters, { channelKey: opts.channelKey, allowPrivateTargets: allowPrivate, allowInsecureWebhooks: allowInsecure, lookup: opts.alerts?.lookup });
+  registerAlertRoutes(app, opts.pool, now, limiters, { channelKey: opts.channelKey, allowPrivateTargets: allowPrivate, allowInsecureWebhooks: allowInsecure, lookup: opts.alerts?.lookup, sampleIntervalSeconds });
   if (opts.alerts?.jobs) {
     startAlertJobs(app, opts.pool, {
       now, health, evaluateMs: opts.alerts.evaluateMs, notifyMs: opts.alerts.notifyMs,

@@ -11,13 +11,15 @@ public sealed record AgentOptions(
     IReadOnlyList<string>? ServerPins = null,
     string? TokenReader = null,
     string? EnrollTokenFile = null,
-    bool Rotate = false)
+    bool Rotate = false,
+    string? SensorHelper = null)
 {
     public static AgentOptions Parse(string[] args)
     {
         var service = false;
         var insecure = false;
         var rotate = false;
+        string? sensorHelper = null;
         string? server = null, tokenFile = null, dataDir = null, importToken = null, tokenReader = null, enroll = null;
         var pins = new List<string>();
         for (var i = 0; i < args.Length; i++)
@@ -38,6 +40,10 @@ public sealed record AgentOptions(
                     break;
                 case "--import-token":
                     importToken = Value(args, ref i);
+                    break;
+                case "--sensor-helper":
+                    sensorHelper = Value(args, ref i);
+                    if (!Path.IsPathFullyQualified(sensorHelper)) throw new ArgumentException($"--sensor-helper mutlak yol olmali: {sensorHelper}");
                     break;
                 case "--rotate":
                     rotate = true;
@@ -67,7 +73,7 @@ public sealed record AgentOptions(
         if (enroll is not null && importToken is not null) throw new ArgumentException("--enroll ile --import-token birlikte kullanilamaz.");
         if (rotate && server is null) throw new ArgumentException("--rotate icin --server gerekli.");
         if (rotate && (enroll is not null || importToken is not null)) throw new ArgumentException("--rotate, --enroll/--import-token ile birlikte kullanilamaz.");
-        return new AgentOptions(service, insecure, server, tokenFile, dataDir, importToken, pins.Count == 0 ? null : pins, tokenReader, enroll, rotate);
+        return new AgentOptions(service, insecure, server, tokenFile, dataDir, importToken, pins.Count == 0 ? null : pins, tokenReader, enroll, rotate, sensorHelper);
     }
 
     private static string Value(string[] args, ref int i)

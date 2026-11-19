@@ -43,14 +43,18 @@ public sealed class AgentWorker(AgentOptions options, ILogger<AgentWorker> log, 
         // GPU (M4): NVML salt okunur, standart hesapla calisir; surucu/DLL yoksa sonuc bos olur ve diger metrikler surer.
         using var nvmlApi = new NvmlNativeApi();
         using var nvml = new NvmlGpuProvider(nvmlApi);
-        var runner = new CollectorRunner(
-        [
+        // Sensor yardimcisi: VARSAYILAN KAPALI; yalniz --sensor-helper ile (bkz. SensorWiring). Hatali yapilandirma kapali kalir, agent calismaya devam eder.
+        await using var sensors = SensorWiring.TryCreate(options, m => log.LogInformation("{Message}", m), m => log.LogWarning("{Message}", m));
+        var collectors = new List<ICollector>
+        {
             new CpuCollector(cpu),
             new MemoryCollector(new WindowsMemoryInfoSource()),
             new DiskCollector(new SystemDriveSource()),
             new NetworkCollector(new SystemNetworkSource(), () => Environment.TickCount64),
             new GpuCollector([nvml], TimeSpan.FromSeconds(5), readTimeout: TimeSpan.FromSeconds(1), rediscoveryInterval: TimeSpan.FromSeconds(60)),
-        ], TimeSpan.FromSeconds(2));
+        };
+        if (sensors is not null) collectors.Add(sensors.Collector);
+        var runner = new CollectorRunner(collectors, TimeSpan.FromSeconds(2));
 
         SamplingPipeline? pipeline = null;
         Uploader? uploader = null;

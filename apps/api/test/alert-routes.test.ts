@@ -241,6 +241,24 @@ describe("kanallar", () => {
     expect((await api(k, "DELETE", `/api/v1/notification-channels/${id}`, { cookie: owner })).statusCode).toBe(204);   // tetikleyici yokken calisir
   });
 
+  it("M-pencere: kural penceresi en az 2 ornekleme araligi olmali (aksi halde pencere bazen bos kalir ve sureli kural tetiklenemez); POST ve PATCH, yalniz o kuralin pencere alani", async () => {
+    const slow = await setupKit({ sampleIntervalSeconds: 30, alerts: { lookup: async () => PUBLIC } });
+    try {
+      await addUser(slow, "o30@example.com", PW, "owner");
+      const c = await loginAs(slow, "o30@example.com", PW);
+      const bad = await api(slow, "POST", "/api/v1/alert-rules", { cookie: c, body: rule({ window_seconds: 45 }) });      // 45 < 2*30
+      expect(bad.statusCode).toBe(400);
+      expect(body(bad).error).toBe("window_too_small");
+      const ok = await api(slow, "POST", "/api/v1/alert-rules", { cookie: c, body: rule({ window_seconds: 60 }) });       // tam sinir: kabul
+      expect(ok.statusCode).toBe(201);
+      const id = body(ok).id;
+      expect((await api(slow, "PATCH", `/api/v1/alert-rules/${id}`, { cookie: c, body: { window_seconds: 30 } })).statusCode).toBe(400);
+      expect((await api(slow, "PATCH", `/api/v1/alert-rules/${id}`, { cookie: c, body: { threshold: 50 } })).statusCode).toBe(200);   // ilgisiz alan etkilenmez
+    } finally { await slow.close(); }
+    // varsayilan aralik (5 sn): en kucuk pencere (15 sn) gecerli
+    expect((await api(k, "POST", "/api/v1/alert-rules", { cookie: owner, body: rule({ window_seconds: 15, name: "kucuk-pencere" }) })).statusCode).toBe(201);
+  });
+
   it("test bildirimi: 202 kuyruga eklenir (olaysiz, kind=test); baska org 404; silinmis kanal 404; hiz siniri 429", async () => {
     const id = body(await api(k, "POST", "/api/v1/notification-channels", { cookie: admin, body: hook({ name: "test-kanali" }) })).id;
     const r = await api(k, "POST", `/api/v1/notification-channels/${id}/test`, { cookie: admin });
