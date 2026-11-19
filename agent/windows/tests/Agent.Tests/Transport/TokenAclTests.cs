@@ -45,6 +45,24 @@ public sealed class TokenAclTests : IDisposable
     }
 
     [Fact]
+    public void Yeniden_yazarken_mevcut_dosyanin_servis_hesabi_ACLden_DUSMEZ_rotate_ve_enroll_servisi_kilitlemesin()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        // Servis hesabi yerine BUILTINUsers (testi calistiran kullanici uyedir): ilk yazma servis hesabini verir, ikinci yazma (--rotate/--enroll,
+        // --token-reader OLMADAN) bu hesabi KAYBETMEMELI; aksi halde servis yeni kimlik bilgisini okuyamaz ve cihaz kilitlenir.
+        var users = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
+        var path = Path.Combine(_dir, "identity", "token.bin");
+        new TokenStore(path, [users.Value]).Save("ilk_kimlik_bilgisi_0123456789abcdefghij");
+        new TokenStore(path).Save("yeni_kimlik_bilgisi_0123456789abcdefghij");           // okuyucu hesap verilmedi
+
+        var rules = new FileInfo(path).GetAccessControl().GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>()
+            .Where(r => r.AccessControlType == AccessControlType.Allow).ToList();
+        Assert.Contains(rules, r => r.IdentityReference.Equals(users) && r.FileSystemRights.HasFlag(FileSystemRights.Modify));
+        Assert.DoesNotContain(rules, r => r.IdentityReference.Equals(new SecurityIdentifier(WellKnownSidType.WorldSid, null)));   // Everyone'a ASLA acilmaz
+        Assert.True(new TokenStore(path).TryLoad(out var t) && t == "yeni_kimlik_bilgisi_0123456789abcdefghij");
+    }
+
+    [Fact]
     public void Ek_hesap_dosya_ACLinde_Modify_yetkisiyle_bulunur_ve_genis_gruplar_yoktur()
     {
         if (!OperatingSystem.IsWindows()) return;

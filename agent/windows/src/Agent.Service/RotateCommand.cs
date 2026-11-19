@@ -32,7 +32,7 @@ public static class RotateCommand
             case RotateOutcome.Rotated:
                 store.Save(r.Credential!);
                 if (!store.TryLoad(out var check) || check != r.Credential) { error.WriteLine("Yeni kimlik bilgisi yazildi ama dogrulanamadi; komutu yeniden calistirin."); return 5; }
-                File.Delete(idFile);
+                try { File.Delete(idFile); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* donme tamam */ }
                 output.WriteLine($"Kimlik bilgisi donduruldu. Eski kimlik bilgisi {r.OverlapExpiresAt:u} tarihine kadar gecerli; yeni kimlik bilgisi ilk kullanildiginda eskisi iptal olur.");
                 return 0;
             case RotateOutcome.Rejected: error.WriteLine("Kimlik bilgisi reddedildi (iptal edilmis veya gecersiz)."); return 3;

@@ -28,6 +28,8 @@ public sealed class TokenStore(string path, IReadOnlyList<string>? extraAccounts
 
         // Hesap adlari dosya olusturulmadan once cozumlenir: bilinmeyen hesap yarim kalmis dosya birakmaz.
         var extra = ResolveAccounts(extraAccounts);
+        // Mevcut dosyanin ACL'indeki ek hesaplar (servis sanal hesabi) KORUNUR: --rotate/--enroll gibi okuyucu hesap belirtmeyen yazimlar servisi kilitlemesin.
+        foreach (var sid in ExistingPrincipals()) if (!extra.Contains(sid)) extra.Add(sid);
 
         var dir = System.IO.Path.GetDirectoryName(Path)!;
         Directory.CreateDirectory(dir);
@@ -109,6 +111,21 @@ public sealed class TokenStore(string path, IReadOnlyList<string>? extraAccounts
                 Thread.Sleep(10);
             }
         }
+    }
+
+    /// <summary>Var olan dosyanin Allow ACE'lerindeki hesaplar (SYSTEM/Administrators haric). Okunamazsa bos (yeni dosya varsayilan kurala doner).</summary>
+    private List<SecurityIdentifier> ExistingPrincipals()
+    {
+        try
+        {
+            if (!File.Exists(Path)) return [];
+            return new FileInfo(Path).GetAccessControl().GetAccessRules(true, false, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>()
+                .Where(r => r.AccessControlType == AccessControlType.Allow)
+                .Select(r => (SecurityIdentifier)r.IdentityReference)
+                .Where(s => !s.IsWellKnown(WellKnownSidType.LocalSystemSid) && !s.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid) && !s.IsWellKnown(WellKnownSidType.WorldSid))
+                .Distinct().ToList();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException) { return []; }
     }
 
     private static List<SecurityIdentifier> ResolveAccounts(IReadOnlyList<string>? accounts)

@@ -58,12 +58,16 @@ public static class EnrollCommand
                     return 5;
                 }
                 TryWipe(tokenFile);
-                File.Delete(idFile);
+                TryDelete(idFile);
                 output.WriteLine($"Kayit tamam. Cihaz kimligi: {r.DeviceId}");
                 output.WriteLine($"Kimlik bilgisi korumali depoya yazildi: {store.Path}");
                 if (r.SpkiPins is { Count: > 0 }) output.WriteLine("Sunucu sertifika pin(ler)i (servisi --server-pin ile yapilandirirken kullanin): " + string.Join(", ", r.SpkiPins));
                 return 0;
-            case EnrollOutcome.Rejected: error.WriteLine("Kayit reddedildi: belirec gecersiz, kullanilmis veya suresi dolmus."); return 3;
+            case EnrollOutcome.Rejected:
+                // 401: ya belirec gecersiz/kullanilmis ya da eski enroll_id'nin yeniden deneme penceresi kapandi. Eski enroll_id'yi SIFIRLA:
+                // yeni bir belirecle yeniden denenirken bayat kimlik komutu kalici olarak reddettirmesin.
+                TryDelete(idFile);
+                error.WriteLine("Kayit reddedildi: belirec gecersiz, kullanilmis veya suresi dolmus (yeni bir belirecle yeniden deneyin)."); return 3;
             case EnrollOutcome.RateLimited: error.WriteLine("Cok fazla deneme (hiz siniri). Biraz bekleyip yeniden deneyin."); return 4;
             case EnrollOutcome.TlsRejected: error.WriteLine("TLS dogrulamasi basarisiz (sertifika/pin). Belirec GONDERILMEDI."); return 6;
             case EnrollOutcome.ClientError: error.WriteLine("Sunucu istegi reddetti (beklenmeyen 4xx). Agent ve sunucu surumlerini kontrol edin."); return 7;
@@ -112,6 +116,12 @@ public static class EnrollCommand
         using var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64).OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
         var g = key?.GetValue("MachineGuid") as string;
         return string.IsNullOrWhiteSpace(g) ? Environment.MachineName : g!;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* kayit tamam; artik dosya zararsiz */ }
     }
 
     private static void TryWipe(string path)
