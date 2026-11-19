@@ -23,7 +23,8 @@ test("yatay tasma yok: genel bakis, liste, detay (tum sekmeler), giris", async (
   await open(page, `/cihaz/${state().devices.online.id}`);
   for (const tab of ["Genel", "CPU", "Bellek", "Depolama", "GPU", "Ağ", "Bilgi"]) {
     await page.getByRole("tab", { name: tab }).click();
-    if (tab !== "Bilgi") await expect(page.locator("canvas").first()).toBeVisible();
+    // Grafik, veri istegi + cizim sonrasi gorunur; yavas CI kosucusunda (3 gorunum art arda) 10 sn varsayilani yetmeyebilir: bu test duzen tasmasini sinar, hiz degil.
+    if (tab !== "Bilgi") await expect(page.locator("canvas").first()).toBeVisible({ timeout: 30_000 });
     await noOverflow(page, `detay/${tab}`);
   }
 });
